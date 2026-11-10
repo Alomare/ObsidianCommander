@@ -7,9 +7,9 @@ const base = (p: P) => ({
   strokeLinecap: "square" as const, strokeLinejoin: "miter" as const, "aria-hidden": true, ...p,
 });
 
-/** Starts the game: the solid triangle of Obsidian's own Play. */
+/** Starts the game: the solid triangle of the Obsidian Play. */
 export const IPlay = (p: P) => <svg {...base(p)} fill="currentColor" stroke="none"><path d="M7 4.5v15l13-7.5z" /></svg>;
-/** The war clock's controls: drawn in a ring, so they never read as the game's Play. */
+/** The war clock controls: drawn in a ring, so they never read as the game Play. */
 export const IClockPause = (p: P) => <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M10 8.5v7M14 8.5v7" strokeWidth={2.2} /></svg>;
 export const IClockResume = (p: P) => <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M10 8v8l6-4z" fill="currentColor" strokeWidth={1.2} strokeLinejoin="round" /></svg>;
 export const IBack = (p: P) => <svg {...base(p)}><path d="M15 5l-7 7 7 7" /></svg>;
@@ -18,7 +18,7 @@ export const ICheck = (p: P) => <svg {...base(p)}><path d="M5 12.5l4.5 4.5L19 7.
 export const IImport = (p: P) => <svg {...base(p)}><path d="M12 3.5V15M7.5 10.5L12 15l4.5-4.5" /><path d="M4 13.5v7h16v-7" /></svg>;
 export const IExport = (p: P) => <svg {...base(p)}><path d="M12 15V3.5M7.5 8L12 3.5 16.5 8" /><path d="M4 13.5v7h16v-7" /></svg>;
 export const ITrash = (p: P) => <svg {...base(p)}><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5" /></svg>;
-/** Obsidian's cog, so Settings looks the same in both. */
+/** The Obsidian cog, so Settings looks the same in both. */
 export const IGear = (p: P) => (
   <svg {...base(p)} strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -33,7 +33,7 @@ export const ILan = (p: P) => <svg {...base(p)}><rect x="9" y="3" width="6" heig
 export const IUsers = (p: P) => <svg {...base(p)}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.7 3.3-5.5 6.5-5.5s5.7 1.8 6.5 5.5" /><path d="M15.5 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.8.8 3 2.5 3.5 5.2" /></svg>;
 export const IList = (p: P) => <svg {...base(p)}><path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1" /></svg>;
 export const IStats = (p: P) => <svg {...base(p)}><path d="M5 20V11M12 20V4M19 20v-6" strokeWidth={2.6} /></svg>;
-/** Rank chevrons: the Game Master's orders. */
+/** Rank chevrons: the Game Master orders. */
 export const ICommand = (p: P) => <svg {...base(p)}><path d="M5 10l7-5 7 5M5 15l7-5 7 5M5 20l7-5 7 5" /></svg>;
 export const IChevron = (p: P) => <svg {...base(p)}><path d="M9 5l7 7-7 7" /></svg>;
 export const IClose = (p: P) => <svg {...base(p)}><path d="M6 6l12 12M18 6L6 18" /></svg>;

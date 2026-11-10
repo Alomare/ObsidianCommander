@@ -1,5 +1,5 @@
-// Walks Obsidian's COMMANDER tab in a release exe and takes screenshots, on the model of
-// ObsidianLauncher's internal/tools/walk/walk_exe.mjs (WebView2's debugging port, real mouse events).
+// Walks the Obsidian COMMANDER tab in a release exe and takes screenshots, on the model of
+// ObsidianLauncher internal/tools/walk/walk_exe.mjs (WebView2 debugging port, real mouse events).
 //
 //   OBSIDIAN_EXE=<Obsidian.exe> COMMANDER_ZIP=<package zip> OBSIDIAN_WALK=<scratch folder> node tools/walk_tab.mjs
 //   (or COMMANDER_FETCH=1 instead of COMMANDER_ZIP: Install Package downloads the newest release from GitHub)
@@ -17,7 +17,7 @@ import path from "node:path";
 const SP = process.env.OBSIDIAN_WALK;
 const EXE = process.env.OBSIDIAN_EXE;
 const ZIP = process.env.COMMANDER_ZIP;
-// COMMANDER_FETCH=1: Install Package downloads the newest release from GitHub, as a player's does.
+// COMMANDER_FETCH=1: Install Package downloads the newest release from GitHub, as it does for a player.
 const FETCH = process.env.COMMANDER_FETCH === "1";
 if (!SP || !EXE || (!ZIP && !FETCH)) {
   console.error("Set OBSIDIAN_WALK, OBSIDIAN_EXE, and COMMANDER_ZIP or COMMANDER_FETCH=1.");
@@ -25,7 +25,7 @@ if (!SP || !EXE || (!ZIP && !FETCH)) {
 }
 const DATA = path.join(SP, "data"), APPDATA = path.join(SP, "appdata"), WEBVIEW = path.join(SP, "webview"), SHOTS = path.join(SP, "shots");
 const PORT = 9556;
-// The window-state plugin writes beside the real app's data, outside the scratch folder: put it back after.
+// The window-state plugin writes beside the real app data, outside the scratch folder: put it back after.
 const WINDOW_STATE = path.join(process.env.APPDATA, "io.github.alomare.obsidianmodmanager", ".window-state.json");
 const savedWindow = fs.existsSync(WINDOW_STATE) ? fs.readFileSync(WINDOW_STATE) : null;
 const q = JSON.stringify;
@@ -130,7 +130,7 @@ async function main() {
       await click(".cmd-intro .btn", "Join LAN War");
       await until(`document.querySelector('.cmd-join-dialog') != null`, "the dialog");
       await shot("02-join-scanning");
-      await until(`document.querySelector('.cmd-found-empty')?.textContent.includes('No war found')`, "the scan's end", 12000);
+      await until(`document.querySelector('.cmd-found-empty')?.textContent.includes('No war found')`, "the end of the scan", 12000);
       await shot("03-join-none");
       await click(".cmd-join-dialog .close");
       await until(`document.querySelector('.cmd-join-dialog') == null`, "the dialog closing", 5000);

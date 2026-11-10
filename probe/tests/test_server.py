@@ -78,7 +78,7 @@ class ProbeServer(unittest.TestCase):
         self.assertEqual(r["uploaded_statistics"], 5)
         r = self.post(action="upload_leaderboard_statistics", auth=self.auth(), statistics=json.dumps([{"index": 2}]))
         self.assertEqual(r["uploaded_leaderboard_statistics"], 2)
-        # The tamper report has no statistics, so no index: the game keeps its own.
+        # The tamper report has no statistics, so no index: the game keeps the one it has.
         r = self.post(action="upload_statistics", auth=self.auth(), c="1234")
         self.assertNotIn("uploaded_statistics", r)
 

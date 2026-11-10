@@ -1,4 +1,4 @@
-//! The Vanilla war: state and rules, with no I/O and no clock of its own.
+//! The Vanilla war: state and rules, with no I/O and no clock: the caller passes the time in.
 //!
 //! Every function that needs the time takes `now` (server unix seconds) and, for the tick, the real
 //! seconds since the last tick. Randomness comes in through [`Dice`], so tests can fix it. What a call
@@ -12,7 +12,7 @@ pub const ENEMIES: usize = 3;
 pub const MAX_TICK_SECONDS: f64 = 60.0;
 pub const SUPER_EARTH_REGION: i64 = 0;
 pub const HOME_WORLD_REGION: i64 = 11;
-/// Clamp for a planet's or mission's `difficulty`, so a forged value can't win a front in one call.
+/// Clamp for planet and mission `difficulty`, so a forged value can't win a front in one call.
 pub const MAX_DIFFICULTY: f64 = 100.0;
 
 // ---------------------------------------------------------------- randomness
@@ -300,7 +300,7 @@ impl Front {
     }
 }
 
-/// The game's own formula: `clamp(floor(points / (points_max / 10)) + 1, 1, 10)`.
+/// The in-game formula: `clamp(floor(points / (points_max / 10)) + 1, 1, 10)`.
 pub fn region_of(points: i64, points_max: i64) -> i64 {
     if points_max <= 0 {
         return 1;
@@ -584,7 +584,7 @@ impl War {
 
     // ---- points
 
-    /// Moves a front's points, clamped to [0, points_max], and reports a region change.
+    /// Moves front points, clamped to [0, points_max], and reports a region change.
     fn set_front_points(&mut self, front: usize, points: f64, credit: bool, out: &mut Out) {
         let f = &mut self.fronts[front];
         let before = f.region();
@@ -930,7 +930,7 @@ impl War {
         self.check_triggers(now, out);
     }
 
-    /// Ends an event now, with its consequences.
+    /// Ends an event now, with the consequences.
     pub fn end_event(
         &mut self,
         event_id: u64,
@@ -957,7 +957,7 @@ impl War {
         Err("no running event with that id".into())
     }
 
-    /// Sets an event's progress; reaching its goal wins it.
+    /// Sets event progress; reaching the goal wins it.
     pub fn set_event_points(
         &mut self,
         event_id: u64,
@@ -1142,7 +1142,7 @@ impl War {
         !self.state.ended()
     }
 
-    /// A completed planet. `front` is 0-based here: the caller has already turned the game's 1-based
+    /// A completed planet. `front` is 0-based here: the caller has already turned the 1-based in-game
     /// planet `enemy` into a front.
     pub fn credit_planet(
         &mut self,
@@ -1416,7 +1416,7 @@ impl War {
         )
     }
 
-    /// An event as the game reads it. A running event's times are projected from the war clock.
+    /// An event as the game reads it. Running event times are projected from the war clock.
     pub fn event_view(&self, e: &Event, now: i64, attack: bool) -> Value {
         let (start, end) = if e.active() {
             let sp = if self.speed > 0.0 { self.speed } else { 1.0 };

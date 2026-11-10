@@ -70,7 +70,7 @@ pub fn close(app: &App) {
         }
         let port = l.port;
         drop(l.server);
-        // tiny_http wakes its accept thread by connecting to the listen address, which fails for
+        // tiny_http wakes the accept thread by connecting to the listen address, which fails for
         // 0.0.0.0 on Windows: connect on loopback instead.
         http::unblock_accept(SocketAddr::from(([127, 0, 0, 1], port)));
         app.log.line(&format!("LAN listener on port {port} closed"));

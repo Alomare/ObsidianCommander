@@ -57,7 +57,7 @@ fn main() {
             std::thread::park();
         }
     }
-    // Obsidian holds our stdin; when it goes away, so do we.
+    // Obsidian holds the server stdin; when it goes away, the server exits.
     let mut sink = [0u8; 256];
     let mut stdin = std::io::stdin();
     while matches!(stdin.read(&mut sink), Ok(n) if n > 0) {}

@@ -21,7 +21,7 @@ pub struct FeedEntry {
     pub text_key: String,
 }
 
-/// A war with its feed and history, and the folder they live in.
+/// A war with feed and history, and the folder they live in.
 pub struct WarSlot {
     pub war: War,
     pub feed: Vec<FeedEntry>,
@@ -89,7 +89,7 @@ impl WarSlot {
         write_atomic(&self.dir.join("war.json"), &bytes)
     }
 
-    /// Writes a whole new war: war.json plus its feed and history files.
+    /// Writes a whole new war: war.json plus the feed and history files.
     pub fn save_all(&self) -> io::Result<()> {
         self.save()?;
         let mut feed = Vec::new();
@@ -137,7 +137,7 @@ impl WarSlot {
         Ok(())
     }
 
-    /// The war, its feed and its history in one JSON document.
+    /// The war, the feed and the history in one JSON document.
     pub fn export(&self) -> Value {
         serde_json::json!({
             "commander_export": 1,

@@ -1,4 +1,4 @@
-// The galactic war overview: the game's own map, regions coloured by who holds them, events marked.
+// The galactic war overview: the in-game map, regions coloured by who holds them, events marked.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type KeyboardEvent as RKeyboardEvent } from "react";
 import type { War, WarEvent } from "../types";
 import { t } from "../strings";
@@ -24,7 +24,7 @@ export function regionState(war: War, enemy: number, index: number): RegionState
   return "enemy";
 }
 
-/** Colours per faction and state, from the game's table. Alphas lifted, as the game draws additively over a bright backdrop. */
+/** Colours per faction and state, from the game table. Alphas lifted, as the game draws additively over a bright backdrop. */
 function paint(f: Faction, s: RegionState): { fill: string; stroke: string } {
   switch (s) {
     case "liberated": return { fill: gameColor("helldivers", "fill_color", 0.5), stroke: gameColor("helldivers", "border_color", 1) };
@@ -40,7 +40,7 @@ export const FACTION_ACCENT: Record<Faction, string> = {
   cyborgs: gameColor("cyborgs", "active_border_color", 4),
   illuminates: gameColor("illuminates", "active_border_color", 4),
 };
-/** The Helldiver amber of the game's progress bars (bar_color is [r, g, b], without alpha). */
+/** The Helldiver amber of the in-game progress bars (bar_color is [r, g, b], without alpha). */
 export const HELLDIVER_ACCENT = "rgb(255, 170, 20)";
 
 // Room for the home world names: they sit beside and under the rings, never above them.
@@ -77,7 +77,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
   const selId = selection?.kind === "region" ? `${FACTION_OF[selection.enemy]}:${selection.region}` : selection?.kind === "superearth" ? "superearth" : null;
   const selFront = selection && selection.kind !== "superearth" ? FACTION_OF[selection.enemy] : null;
 
-  // The map's size on screen: text keeps a readable size however small the map is drawn.
+  // The map size on screen: text keeps a readable size however small the map is drawn.
   useEffect(() => {
     const el = svg.current;
     if (!el) return;

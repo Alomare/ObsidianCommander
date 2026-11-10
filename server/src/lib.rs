@@ -92,7 +92,7 @@ impl App {
         lock(&self.lan).as_ref().map(|l| l.port)
     }
 
-    /// Records a rules call's effects; a failed write goes to the log.
+    /// Records rules call effects; a failed write goes to the log.
     pub fn commit(&self, slot: &mut WarSlot, out: Out, now: i64) {
         if let Err(e) = slot.commit(out, now) {
             self.log

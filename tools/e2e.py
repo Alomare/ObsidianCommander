@@ -1,12 +1,12 @@
 """End-to-end check of a Commander package with no game: the real server from the package ZIP, the
-game's requests through Obsidian's real relay, the admin API, LAN discovery and the interface.
+game requests through the real Obsidian relay, the admin API, LAN discovery and the interface.
 
 python tools/e2e.py [--zip internal/builds/obsidian-commander-<v>.zip] [--obsidian <ObsidianLauncher checkout>]
 
 Unpacks the ZIP into %TEMP%/cmd-e2e (the same folder each run, so Windows asks about the firewall
 once), starts the server on a free loopback port, creates a war, then:
-  1. game requests shaped like protocol.md's samples, as the relay forwards them (no Steam ticket);
-  2. Obsidian's relay test against this war (cargo test ... relay_reaches_a_real_war -- --ignored);
+  1. game requests shaped like the protocol.md samples, as the relay forwards them (no Steam ticket);
+  2. the Obsidian relay test against this war (cargo test ... relay_reaches_a_real_war -- --ignored);
   3. GM actions through the admin API, and the state they leave;
   4. Open to LAN: the UDP announcement on port 17493, the read-only routes on the LAN listener;
   5. screenshots of the interface with headless Chrome or Edge, in the scratch folder given by
@@ -87,7 +87,7 @@ def main():
     if not a.zip:
         sys.exit("no package: run tools/pack.py first")
 
-    # The same folder each run: Windows keys the firewall answer on the server's path, so a new
+    # The same folder each run: Windows keys the firewall answer on the server path, so a new
     # folder would ask again at Open to LAN and leave two more rules behind.
     work = Path(tempfile.gettempdir()) / "cmd-e2e"
     shutil.rmtree(work, ignore_errors=True)
@@ -113,7 +113,7 @@ def main():
         wid = war["id"]
         season = war["season"]
 
-        # 1. The game's requests.
+        # 1. The game requests.
         code, st = game(base, wid, {"action": "get_campaign_status"})
         rows = st.get("campaign_status", [])
         check("get_campaign_status", code == 200 and st.get("error_code") == 0 and len(rows) == 3 and rows[0].get("season") == season, str(st)[:200])
@@ -133,16 +133,16 @@ def main():
             code, st = game(base, wid, {"action": action, "season": season, "count": 10, "network": "steam", "users": "[]"})
             check(f"{action} answers", code == 200 and st.get("error_code") == 0, str(st)[:160])
 
-        # 2. Obsidian's relay against this war.
+        # 2. The Obsidian relay against this war.
         if Path(a.obsidian, "core").is_dir():
             env = dict(os.environ, COMMANDER_E2E=f"{base}/w/{wid}/1.0/")
             r = subprocess.run(["cargo", "test", "-q", "-p", "obsidian-core", "--lib", "relay_reaches_a_real_war", "--", "--ignored", "--nocapture"],
                                cwd=a.obsidian, env=env, capture_output=True, text=True, timeout=900)
-            check("Obsidian's relay carries the game to the war, ticket stripped", r.returncode == 0 and "E2E " in r.stdout, (r.stdout + r.stderr)[-600:])
+            check("the Obsidian relay carries the game to the war, ticket stripped", r.returncode == 0 and "E2E " in r.stdout, (r.stdout + r.stderr)[-600:])
             code, w = admin(base, "GET", f"/api/wars/{wid}")
             members = [m.get("player") for m in w.get("members", [])]
             relayed = [p for p in members if p and p != "110000100000001" and all(c in "0123456789abcdef" for c in p)]
-            check("the relay's player header names the member", len(relayed) == 1, str(members))
+            check("the relay player header names the member", len(relayed) == 1, str(members))
         else:
             print("SKIP relay: no ObsidianLauncher checkout at", a.obsidian)
 

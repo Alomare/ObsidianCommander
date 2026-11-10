@@ -24,7 +24,7 @@ def load_fixture(name):
 
 
 class War:
-    """The probe's whole war state. Only the custom scenario's points move."""
+    """The whole probe war state. Only the custom scenario points move."""
 
     def __init__(self):
         now = int(time.time())
@@ -65,10 +65,10 @@ class War:
     def complete_planets(self, planets):
         """A planet completion gives 1000 points per difficulty level to that front, capped at max.
 
-        Here `enemy` is the planet's own field, 1-based (1 bugs, 2 cyborgs, 3 illuminates), unlike
+        Here `enemy` is the planet field, 1-based (1 bugs, 2 cyborgs, 3 illuminates), unlike
         every other enemy number in the protocol: probe run 5 sent enemy 2 for a cyborg planet whose
         upload_statistics said enemy 1. `success` is a fraction (0.700004995 there), `difficulty` the
-        sum of (mission difficulty + 1) over the planet's missions."""
+        sum of (mission difficulty + 1) over the planet missions."""
         for p in planets:
             if not isinstance(p, dict):
                 continue
@@ -163,7 +163,7 @@ def respond(scenario, war, action, params):
         out["usernames"] = []
         return out
 
-    # Writes. Each answer carries the highest queue index taken, as the official server's does.
+    # Writes. Each answer carries the highest queue index taken, as the official server does.
     if action == "complete_planets":
         planets = params.get("planets_json")
         war.complete_planets(planets if isinstance(planets, list) else [])

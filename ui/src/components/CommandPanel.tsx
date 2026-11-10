@@ -1,4 +1,4 @@
-// The side panel's first tab: what is selected on the map, and the Game Master's orders for it.
+// The first tab of the side panel: what is selected on the map, and the Game Master orders for it.
 import { useEffect, useState, type CSSProperties } from "react";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";

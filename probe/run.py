@@ -8,7 +8,7 @@ python run.py all --mission            instead of the scenarios: one campaign mi
 python run.py end                      purge the probe, redeploy the real library, compare the saves
 
 Deploys into a throwaway Obsidian data folder (internal/probe-data) with Obsidian API, Obsidian
-Patches (the four skips on) and the probe mod, the way the app's own live tests do. Needs a built
+Patches (the four skips on) and the probe mod, the way the live tests of the app do. Needs a built
 ObsidianModManager/target/debug/obsidian.exe and no game running. Output: probe/runs/<time>/.
 """
 import argparse
@@ -51,7 +51,7 @@ def game_running():
 
 
 def hashes():
-    """Every file of the real saves: the local folder and the game's Steam Cloud folders."""
+    """Every file of the real saves: the local folder and the Steam Cloud folders of the game."""
     out = {}
     for root in SAVES:
         if not root.exists():
@@ -76,7 +76,7 @@ def begin():
     # A vanilla game stays vanilla afterwards: only a library that was deployed goes back.
     (STATE / "real-was-deployed.txt").write_text("no" if "the game is vanilla" in r.stdout else "yes")
     obs("purge", real=True)
-    # The exe takes the loader beside it first, a copy made by its last build.
+    # The exe takes the loader beside it first, a copy made by the last build.
     shutil.copytree(OBS_REPO / "loader" / "src", OBS.parent / "loader" / "src", dirs_exist_ok=True)
     for folder, mod in ((KIT / "ObsidianAPI", "obsidian.api"), (KIT / "ObsidianPatches", "obsidian.qol"),
                         (HERE / "mod", "obsidian.cmdprobe")):
@@ -115,8 +115,8 @@ def mission_run(out):
     """One real campaign mission on the custom war: roll the planets, launch, win through the API,
     hurry the end screens, then watch the uploads on the ship."""
     log = drive(out, "cmd:menu campaign", "sleep:10", "cmd:close", "sleep:4", "cmd:save",
-                # Cyborgs: the custom war's defend event sits on the bugs front, and while it runs the
-                # war screen puts that front's planets in the event region, so mission end reports no
+                # Cyborgs: the custom war defend event sits on the bugs front, and while it runs the
+                # war screen puts the planets of that front in the event region, so mission end reports no
                 # completed planet there (calculate_region of the points differs). Seen in run 4.
                 "cmd:campaign_mission 2","wait:MISSION READY:900", "shot:mission", "cmd:win",
                 "wait:STATE mission_end:180", "sleep:6", "shot:mission-end")
@@ -132,7 +132,7 @@ def mission_run(out):
             steps.append(f"shot:end-{i}")
     drive(out, *steps)
     drive(out, "wait:SHIP AGAIN:600", "sleep:5", "cmd:state")
-    # Each upload is a separate job; a wait that times out ends only its own drive call.
+    # Each upload is a separate job; a wait that times out ends only that drive call.
     for callback in ("upload_statistics_callback", "completed_planets_callback", "leaderboard_stats_callback"):
         drive(out, f"wait:CALLBACK {callback}:150")
     drive(out, "sleep:10", "cmd:save", "cmd:state", "shot:ship-after")
@@ -151,17 +151,17 @@ def finish_mission(out, tag):
 
 def hd2_run(out):
     """The HD2-model probes (docs/probe.md), safest first."""
-    # A. The mod's own HTTP channel.
+    # A. The mod HTTP channel.
     drive(out, "cmd:http first", "wait:HTTP decoded:60", "sleep:2")
-    # B. Planets rolled, then three of them made ours.
+    # B. Planets rolled, then three of them made custom.
     drive(out, "cmd:menu campaign", "sleep:10", "shot:war-stock", "cmd:close", "sleep:4",
           "cmd:custom_planets 2", "cmd:planets")
-    # C, D. Globe tinted, hidden, shown; the screen muted with our panel over it.
+    # C, D. Globe tinted, hidden, shown; the screen muted with the custom panel over it.
     drive(out, "cmd:menu campaign", "sleep:8", "cmd:tint on", "sleep:3", "shot:war-tint",
           "cmd:globe hide", "sleep:3", "shot:war-hidden", "cmd:globe show", "cmd:tint off", "sleep:3",
           "cmd:overlay mute", "sleep:3", "shot:war-overlay", "cmd:overlay off", "sleep:2", "shot:war-after-overlay",
           "cmd:close", "sleep:4")
-    # B2. A region change rerolls the planets; ours have to come back.
+    # B2. A region change rerolls the planets; the custom ones have to come back.
     scenario("minimal")
     drive(out, "cmd:poll", "sleep:12", "cmd:menu campaign", "sleep:10", "cmd:close", "sleep:3", "cmd:planets")
     scenario("custom")
@@ -188,7 +188,7 @@ def play(tls, broken, mission=False):
     out = HERE / "runs" / time.strftime("%Y%m%d-%H%M%S")
     srv, probe = server.serve(PORT, "custom", out, tls=tls)
     if tls:
-        # Plain HTTP is the admin channel's only door, so a TLS run keeps a second server for it.
+        # Plain HTTP is the only door of the admin channel, so a TLS run keeps a second server for it.
         print("TLS run: scenario switches need --tls off; this run stays on custom")
     scheme = "https" if tls else "http"
     CFG.write_text(f"url={scheme}://127.0.0.1:{PORT}/1.0/\nisolate_save=1\nblock_telemetry=1\n")

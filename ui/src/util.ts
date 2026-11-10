@@ -8,7 +8,7 @@ export const FACTION_OF: Faction[] = ["bugs", "cyborgs", "illuminates"];
 export const enemyName = (e: number) => tk(`enemy${e}`);
 export const enemySingle = (e: number) => tk(`enemySingle${e}`);
 
-/** A region's name: the game's words from Obsidian when there are any, else a plain label. */
+/** A region name: the in-game words from Obsidian when there are any, else a plain label. */
 export function regionName(enemy: number | null | undefined, region: number | null | undefined, names: Record<string, string>): string {
   if (region === 0) return names.region_superearth_01 || t("superEarth");
   if (enemy == null || region == null) return "";
@@ -63,7 +63,7 @@ export function dateTime(unix: number): string {
   return new Date(unix * 1000).toLocaleString("en-GB", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-/** A member's name, or the short player ID when the server has no name. */
+/** A member name, or the short player ID when the server has no name. */
 export function memberName(war: War | null, player: string | null | undefined): string {
   if (!player) return t("someone");
   if (player === "gm") return t("gmName");
@@ -90,7 +90,7 @@ export function feedText(e: FeedEntry, war: War | null, names: Record<string, st
   return `${words.charAt(0).toUpperCase()}${words.slice(1)}${where ? `: ${where}` : ""}${e.value != null ? ` (${vars.value})` : ""}.`;
 }
 
-/** A feed entry's tone, for the dot beside it. */
+/** A feed entry tone, for the dot beside it. */
 export function feedTone(e: FeedEntry): "good" | "bad" | "event" | "gm" | "plain" {
   if (e.player === "gm" || e.kind === "gm") return "gm";
   if (/lost|fail|defeat(?!ed)/.test(e.text_key) || e.text_key === "region_lost") return "bad";

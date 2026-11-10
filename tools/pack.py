@@ -7,7 +7,7 @@ writes internal/builds/obsidian-commander-<version>.zip:
 
     commander.json, commander-server.exe, ui/..., LICENSE, THIRD-PARTY-NOTICES.txt
 
-The version is the server crate's. The interface's mock file stays out: it only serves `?mock=1`
+The version comes from the server crate. The interface mock file stays out: it only serves `?mock=1`
 during development.
 """
 import argparse

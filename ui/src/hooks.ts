@@ -5,7 +5,7 @@ import type { FeedEntry, Snapshot, War } from "./types";
 const POLL_MS = 2500;
 const HISTORY_MS = 30000;
 
-/** The war, its feed and history, polled with cheap GETs while the page is visible. */
+/** The war, the feed and the history, polled with cheap GETs while the page is visible. */
 export function useWarData(id: string) {
   const [war, setWar] = useState<War | null>(null);
   const [feed, setFeed] = useState<FeedEntry[]>([]);
@@ -85,7 +85,7 @@ export function useNow(ms = 1000): number {
   return n;
 }
 
-/** A number that eases to its new value instead of jumping. */
+/** A number that eases to the new value instead of jumping. */
 export function useTween(target: number, ms = 700): number {
   const [v, setV] = useState(target);
   const from = useRef(target);

@@ -90,7 +90,7 @@ export function Modal({ title, onClose, children, foot, className = "", keep }: 
   );
 }
 
-/* The confirming button is Obsidian's: gold for a go-ahead, red for something that can't be taken back.
+/* The confirming button comes from Obsidian: gold for a go-ahead, red for something that can't be taken back.
    Cancel takes the focus, so Enter right after opening never confirms by accident. */
 export function Confirm({ title, text, okLabel, danger, onOk, onClose, children }: { title: string; text: string; okLabel: string; danger?: boolean; onOk: () => void; onClose: () => void; children?: ReactNode }) {
   return (
@@ -104,8 +104,8 @@ export function Confirm({ title, text, okLabel, danger, onOk, onClose, children 
   );
 }
 
-/* A button's menu: items run and close it; Escape, a click elsewhere, a scroll or leaving the window close it.
-   It sits on the body, so a folded corner's mask can't cut it off. */
+/* A button menu: items run and close it; Escape, a click elsewhere, a scroll or leaving the window close it.
+   It sits on the body, so a folded corner mask can't cut it off. */
 export type MenuItem = { label: string; icon?: ReactNode; danger?: boolean; disabled?: boolean; tip?: string; run: () => void };
 export function MenuButton({ label, icon, items, className = "btn icon" }: { label: string; icon: ReactNode; items: MenuItem[]; className?: string }) {
   const btn = useRef<HTMLButtonElement>(null);
@@ -176,7 +176,7 @@ export function Seg<T extends string | number>({ value, options, onChange, disab
   );
 }
 
-/** A number field that keeps its text while typing and commits on blur or Enter. */
+/** A number field that keeps the text while typing and commits on blur or Enter. */
 export function NumberField({ value, min, max, step, onChange, suffix, width }: { value: number; min: number; max: number; step: number; onChange: (v: number) => void; suffix?: string; width?: string }) {
   const [text, setText] = useState(String(value));
   const focused = useRef(false);

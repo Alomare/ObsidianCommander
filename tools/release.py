@@ -1,4 +1,4 @@
-"""Publishes a Commander release on GitHub: the tag, the release text and the package ZIP that Obsidian's
+"""Publishes a Commander release on GitHub: the tag, the release text and the package ZIP that the Obsidian
 Install Package downloads.
 
 python tools/release.py <version> <notes.md>

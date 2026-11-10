@@ -321,7 +321,7 @@ fn delete(app: &Arc<App>, id: &str) -> Resp {
     if let Err(e) = std::fs::remove_dir_all(&slot.dir)
         && slot.dir.exists()
     {
-        return Resp::error(500, &format!("could not delete the war's folder: {e}"));
+        return Resp::error(500, &format!("could not delete the war folder: {e}"));
     }
     app.log.line(&format!("war {id} deleted"));
     Resp::json(200, &json!({"deleted": id}))
@@ -546,7 +546,7 @@ fn action(app: &App, req: &Req, id: &str) -> Resp {
             f.front = front;
             f.value = value;
             f.event_id = body.get("event_id").and_then(Value::as_u64);
-            // The GM's entry first, then what it caused.
+            // The GM entry first, then what it caused.
             out.feed.insert(0, f);
             out.changed = true;
             app.log.line(&format!("war {id}: GM {name}"));

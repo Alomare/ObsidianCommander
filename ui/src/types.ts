@@ -1,4 +1,4 @@
-// The admin API's shapes (docs/spec-m1.md, section 5).
+// The admin API shapes (docs/spec-m1.md, section 5).
 
 export type Enemy = 0 | 1 | 2;
 export type FrontStatus = "active" | "defeated" | "hidden";

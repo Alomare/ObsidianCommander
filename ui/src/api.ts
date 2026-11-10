@@ -22,7 +22,7 @@ export class ApiError extends Error {
   }
 }
 
-// The token comes once in the URL; it then leaves the address bar and stays for this page's life.
+// The token comes once in the URL; it then leaves the address bar and stays for the life of this page.
 const params = new URLSearchParams(location.search);
 let token: string | null = params.get("token");
 try {

@@ -1,5 +1,5 @@
 """Milestone 1 in the game: a Vanilla war hosted by `obsidian commander serve`, played through the
-loader's war mode and Obsidian's relay.
+loader war mode and the Obsidian relay.
 
 python probe/war_run.py all --obsidian <ObsidianLauncher checkout with a built target/debug/obsidian.exe>
 
@@ -7,12 +7,12 @@ begin  records the real saves, purges the real library, builds a throwaway libra
        internal/war-data (API, QoL with the four skips, the probe mod as a driver), installs the
        newest package from internal/builds, and deploys.
 play   starts `obsidian commander serve`, creates a war through the admin API, selects it with
-       `obsidian commander play` (a Sandbox of its own, the war line), redeploys the settings, then
-       launches the game and checks: the loader's war mode, the war map drawing the war's numbers,
+       `obsidian commander play` (a separate Sandbox, the war line), redeploys the settings, then
+       launches the game and checks: the loader war mode, the war map drawing the war numbers,
        a GM push showing in the game after a poll, one mission credited to the war.
 end    back to the official war, purge, the real library redeployed if it was, the real saves compared.
 
-Output: probe/runs/war-<time>/ with the logs, the server's war JSON and the screenshots.
+Output: probe/runs/war-<time>/ with the logs, the server war JSON and the screenshots.
 """
 import argparse
 import hashlib
@@ -123,7 +123,7 @@ def play():
         if not war_line:
             sys.exit("no war line in settings.txt")
         relay_url = war_line.split("\t")[2]
-        # The probe mod drives the game; its URL is the relay's, the same the loader sets.
+        # The probe mod drives the game; the URL is the relay URL, the same the loader sets.
         CFG.write_text(f"url={relay_url}\nisolate_save=0\nblock_telemetry=0\nno_tutorial=1\n")
         log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:900", f"wait:POLL season={war['season']}:240", "sleep:5", "cmd:state", "shot:ship")
         if "TIMEOUT" in log or "GAME GONE" in log:

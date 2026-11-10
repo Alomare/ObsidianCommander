@@ -1,6 +1,6 @@
 # commander-server
 
-The Obsidian Commander server: hosts custom Galactic Wars for HELLDIVERS 1, answers the game's war API, runs the Vanilla rules, and serves the admin API and the interface. The contract is [docs/spec-m1.md](../docs/spec-m1.md), sections 2 to 5.
+The Obsidian Commander server: hosts custom Galactic Wars for HELLDIVERS 1, answers the war API the game calls, runs the Vanilla rules, and serves the admin API and the interface. The contract is [docs/spec-m1.md](../docs/spec-m1.md), sections 2 to 5.
 
 ## Run
 
@@ -34,7 +34,7 @@ The war clock (`war_time`) is stored with the war: no time passes while the serv
 
 ## Routes
 
-- `POST /w/<id>/1.0/`: the game's war API (form-encoded `action=...`). Player id from `X-Commander-Player` (`local` when missing), name from `X-Commander-Name` (percent-encoded if not ASCII).
+- `POST /w/<id>/1.0/`: the war API the game calls (form-encoded `action=...`). Player id from `X-Commander-Player` (`local` when missing), name from `X-Commander-Name` (percent-encoded if not ASCII).
 - `/api/...`: the admin API (spec section 5). `GET /api/wars/<id>/feed?after=&limit=` answers `{entries, last_id}`; `GET /api/wars/<id>/history?from=` answers `{snapshots: [{season, time, war_time, data: [{points, points_taken, status}]}]}`.
 - Anything else under `GET`: files from the interface folder, with `index.html` for paths without an extension.
 - The LAN listener (`0.0.0.0`, only while a war is open to LAN) answers only the game API and read-only calls of LAN wars, `/` and `/assets/*`. Discovery broadcasts go to UDP 17493 every 3 seconds.

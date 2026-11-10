@@ -1,4 +1,4 @@
-// The game's war map as SVG. data/warfront.json describes each region as cells on a polar grid:
+// The in-game war map as SVG. data/warfront.json describes each region as cells on a polar grid:
 // [angle_start, ring, angle_count], 48 angle steps around, 11 rings out from Super Earth (ring 10 is the
 // home world). Cells of one region merge into one outline, traced along the grid lines.
 //
@@ -14,15 +14,15 @@ export type Faction = (typeof FACTIONS)[number];
 const info = (raw as any).warfront_info;
 export const ANGULAR: number = info.grid_angular_size; // 48
 export const RADIAL: number = info.grid_radial_size; // 11
-const GRID_RADIUS: number = info.grid_radius; // 2: Super Earth's radius in rings
+const GRID_RADIUS: number = info.grid_radius; // 2: radius of Super Earth in rings
 
 /** SVG units per ring. */
 export const UNIT = 44;
-/** The radius of ring boundary `i` (0 = Super Earth's edge, 11 = the outer edge of the home worlds). */
+/** The radius of ring boundary `i` (0 = edge of Super Earth, 11 = the outer edge of the home worlds). */
 export function ringRadius(i: number): number {
   const base = GRID_RADIUS * UNIT * 0.9;
   if (i <= 10) return base + i * UNIT;
-  // The home world ring is drawn a little deeper, so the capital reads as a place of its own.
+  // The home world ring is drawn a little deeper, so the capital reads as a place apart.
   return base + 10 * UNIT + (i - 10) * UNIT * 1.35;
 }
 export const SUPER_EARTH_R = ringRadius(0) - 10;
@@ -137,7 +137,7 @@ function tracePath(id: string, cells: Cell[], owners: Map<string, string>): stri
       const [x, y] = polar(ringRadius(e.to[0]), e.to[1]);
       if (e.kind === "arc") {
         const R = ringRadius(e.to[0]);
-        // Steps grow counterclockwise on screen; SVG's sweep flag 1 is clockwise.
+        // Steps grow counterclockwise on screen; the SVG sweep flag 1 is clockwise.
         const sweep = e.to[1] > e.from[1] ? 0 : 1;
         d += `A${fmt(R)} ${fmt(R)} 0 0 ${sweep} ${fmt(x)} ${fmt(y)}`;
       } else {
@@ -191,7 +191,7 @@ export const REGION_BY_ID = new Map(REGIONS.map((r) => [r.id, r]));
 
 /** The middle step of each front, for labels and the home world name. */
 export const FRONT_MID: Record<Faction, number> = { cyborgs: 8, illuminates: 24, bugs: 40 };
-/** The steps a front spans, for its wedge. */
+/** The steps a front spans, for the wedge. */
 export const FRONT_SPAN: Record<Faction, [number, number]> = { cyborgs: [1, 15], illuminates: [17, 31], bugs: [33, 47] };
 
 /** An arc path from step a to step b at radius r (for text on a path), drawn left to right on screen. */
@@ -212,7 +212,7 @@ export function wedgePath(r0: number, r1: number, a: number, b: number): string 
   return `M${fmt(x0)} ${fmt(y0)}A${fmt(r1)} ${fmt(r1)} 0 ${large} 0 ${fmt(x1)} ${fmt(y1)}L${fmt(x2)} ${fmt(y2)}A${fmt(r0)} ${fmt(r0)} 0 ${large} 1 ${fmt(x3)} ${fmt(y3)}Z`;
 }
 
-/** The game's colours, [a, r, g, b], as CSS. `boost` scales the alpha. */
+/** The in-game colours, [a, r, g, b], as CSS. `boost` scales the alpha. */
 const colors = (raw as any).colors;
 export function gameColor(group: string, name: string, boost = 1): string {
   const c = colors[group]?.[name] as number[] | undefined;

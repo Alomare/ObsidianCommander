@@ -1,4 +1,4 @@
-//! The game's war API (`POST /w/<id>/1.0/`, form-encoded `action=...`), per docs/protocol.md.
+//! The war API the game calls (`POST /w/<id>/1.0/`, form-encoded `action=...`), per docs/protocol.md.
 
 use crate::rules::{ENEMIES, Out, War, mix64};
 use crate::store::WarSlot;
@@ -24,7 +24,7 @@ pub fn error_answer(now: i64) -> Value {
     json!({"time": now, "error_code": 3, "error_message": "Missing or invalid arguments"})
 }
 
-/// A JSON form field (`planets`, `statistics`) as a list of objects. A dict's values count too.
+/// A JSON form field (`planets`, `statistics`) as a list of objects. Dict values count too.
 fn json_rows(fields: &Fields, name: &str) -> Option<Vec<Map<String, Value>>> {
     let v: Value = serde_json::from_str(fields.get(name)?).ok()?;
     let items: Vec<Value> = match v {
@@ -139,7 +139,7 @@ pub fn handle(
 ) -> (Value, Out) {
     let mut out = Out::default();
     let war = &mut slot.war;
-    // The game's reads carry no player: only an identified player is a member.
+    // Game reads carry no player: only an identified player is a member.
     if player != "local" {
         war.touch_member(player, name, now, &mut out);
     }
@@ -375,7 +375,7 @@ pub fn handle(
                 if !row_season_ok(w, r) {
                     return;
                 }
-                // The planet's `enemy` counts from 1.
+                // The planet `enemy` value counts from 1.
                 let Some(enemy) = r
                     .get("enemy")
                     .and_then(Value::as_i64)
@@ -408,7 +408,7 @@ pub fn handle(
                 return (error_answer(now), out);
             };
             let difficulty = num_field(fields, "difficulty").unwrap_or(1.0);
-            // The game's queue for these isn't seen yet; when an index comes along, count it once.
+            // The game queue for these isn't seen yet; when an index comes along, count it once.
             let kind = if attack { "attack" } else { "defend" };
             let fresh = match int_field(fields, "index") {
                 Some(i) => war.take_index(player, kind, i),

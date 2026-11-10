@@ -51,7 +51,7 @@ export const FIELDS: Field[] = [
   { key: "attack_mission_value", kind: "int", min: 10, max: 10000, step: 10, group: "groupAttack" },
 ];
 
-/** A setting's value in the unit the form shows. */
+/** A setting value in the unit the form shows. */
 export function toShown(f: Field, v: number | boolean): number {
   if (f.kind === "bool") return v ? 1 : 0;
   if (f.kind === "chance") return Math.round((v as number) * 1000) / 10;

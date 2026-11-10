@@ -45,7 +45,7 @@ end
 local URL = cfg.url
 local ISOLATE = cfg.isolate_save ~= "0"
 local BLOCK_TELEMETRY = cfg.block_telemetry ~= "0"
--- A fresh save skips boot camp: always with the probe's own save, and on request (a war's new Sandbox).
+-- A fresh save skips boot camp: always with the probe save, and on request (a new war Sandbox).
 local NO_TUTORIAL = ISOLATE or cfg.no_tutorial == "1"
 log("PROBE loading url=" .. URL .. " isolate_save=" .. tostring(ISOLATE) .. " block_telemetry=" .. tostring(BLOCK_TELEMETRY))
 
@@ -76,7 +76,7 @@ obsidian.hook("CampaignManager", "set_environment", function(original, self, ...
 	return unpack(r)
 end)
 
--- 2. A save of its own. The Steam Cloud path calls setup("steam", "helldivers_save") and then a
+-- 2. A separate save. The Steam Cloud path calls setup("steam", "helldivers_save") and then a
 -- backup into helldivers_steam_<id>; both are turned to a local file that only this probe uses.
 if ISOLATE then
 	obsidian.hook("SaveManager", "setup", function(original, self, system, name, ...)
@@ -207,7 +207,7 @@ function COMMANDS.save()
 end
 
 -- A real campaign mission on the easiest planet of a front (1 bugs, 2 cyborgs, 3 illuminates), with
--- that planet's other missions marked done so finishing this one completes the planet. The war
+-- the other missions of that planet marked done so finishing this one completes the planet. The war
 -- screen must have been opened once, since it rolls the planets. Done the way the ship does it: the
 -- planet goes into current_planet, get_mission_seed picks the open mission, then the same transition
 -- the drop pods start, with is_training false.
@@ -256,7 +256,7 @@ function COMMANDS.campaign_mission(rest)
 end
 
 -- Obsidian API first. In the 2026-11-04 runs it refused with needs_session: the probe is a client mod,
--- and the API keeps shared-game calls for session mods, while a session mod would turn on the loader's
+-- and the API keeps shared-game calls for session mods, while a session mod would turn on the loader
 -- upload block this probe is here to get past. So on a refusal it does what win does, directly: mark
 -- the local players extracted and complete the mission. The reason and the host view are logged.
 function COMMANDS.win()
@@ -300,7 +300,7 @@ end
 
 -- ===== HD2-model probes (2026-11-09) =====
 
--- A. The mod's own HTTP to a custom route: the same call shapes as CampaignManager.begin_update_status.
+-- A. The mod HTTP to a custom route: the same call shapes as CampaignManager.begin_update_status.
 local BASE = string.gsub(URL, "/1%.0/?$", "")
 function COMMANDS.http(rest)
 	local http, sjson = g("Http"), g("Sjson")
@@ -326,8 +326,8 @@ function COMMANDS.http(rest)
 	return "sent " .. #body .. " bytes to " .. BASE .. "/commander/report"
 end
 
--- B. Our own persistent planets. Takes the rolled planets of a front, renames the first three to
--- invented keys with words of our own, marks them scanned, and keeps copies; a post-hook on
+-- B. Custom persistent planets. Takes the rolled planets of a front, renames the first three to
+-- invented keys with custom words, marks them scanned, and keeps copies; a post-hook on
 -- generate_planets puts the copies back after every reroll.
 local CUSTOM = {}
 local CUSTOM_NAMES = { "Kepler Prime", "Vandalon IV", "Ursa Station" }
@@ -404,7 +404,7 @@ function COMMANDS.planets(rest)
 	return "listed"
 end
 
--- C. The globe: our colours on every region mesh after the game's, or the whole globe hidden.
+-- C. The globe: the custom colours on every region mesh after the stock ones, or the whole globe hidden.
 local TINT, HIDE = false, nil
 local PALETTE = {
 	{ { 250, 60, 200, 255 }, { 200, 20, 80, 160 } },  -- held: blue
@@ -446,7 +446,7 @@ function COMMANDS.globe(rest)
 	return "hide " .. tostring(HIDE)
 end
 
--- D. The campaign screen muted, with our own war panel drawn over it.
+-- D. The campaign screen muted, with the custom war panel drawn over it.
 local OVERLAY = false
 local ui = obsidian.ui
 local overlay_frames = 0
@@ -477,7 +477,7 @@ function COMMANDS.overlay(rest)
 	return "overlay " .. tostring(OVERLAY) .. " mute " .. tostring(ok) .. " " .. tostring(why) .. " screen " .. tostring(cur and cur.screen)
 end
 
--- E. How much a lobby carries: member data (what api.lobby.share uses) and the host's lobby data.
+-- E. How much a lobby carries: member data (what api.lobby.share uses) and the host lobby data.
 function COMMANDS.lobby(rest)
 	local lobby = g("NetworkGlobal") and g("NetworkGlobal").lobby
 	if not lobby then return "no lobby" end
@@ -504,7 +504,7 @@ function COMMANDS.lobby(rest)
 end
 
 -- F. Launch a custom planet the way players do: current_planet set, pods opened, the Helldiver seated
--- through the pod's own interact command, then the game's countdown and drop.
+-- through the pod interact command, then the game countdown and drop.
 function COMMANDS.pod_launch(rest)
 	local front = tonumber(rest) or 2
 	local list = CUSTOM[front]

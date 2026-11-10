@@ -1,4 +1,4 @@
-//! Starts the server on port 0 and drives it with real HTTP, shaped like docs/protocol.md's samples.
+//! Starts the server on port 0 and drives it with real HTTP, shaped like the samples in docs/protocol.md.
 
 use commander::{Config, Handle};
 use serde_json::{Value, json};
@@ -178,7 +178,7 @@ fn game_api_answers_like_the_official_server() {
     assert_eq!(s["statistics"].as_array().unwrap().len(), 3);
     assert!(s.get("defend_event").is_none());
 
-    // complete_planets: the planet's `enemy` is 1-based, so 2 is the cyborgs (front 1).
+    // complete_planets: the planet `enemy` value is 1-based, so 2 is the cyborgs (front 1).
     let planets = json!([{"index": 1, "enemy": 2, "season": season, "difficulty": 4, "success": 0.700004995}]).to_string();
     let a = auth();
     let r = game(

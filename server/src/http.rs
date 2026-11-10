@@ -59,7 +59,7 @@ impl Resp {
     }
 }
 
-/// Wakes a tiny_http accept thread after its server was dropped.
+/// Wakes a tiny_http accept thread after the server was dropped.
 pub fn unblock_accept(addr: SocketAddr) {
     if let Ok(s) = TcpStream::connect_timeout(&addr, Duration::from_millis(300)) {
         let _ = s.shutdown(std::net::Shutdown::Both);

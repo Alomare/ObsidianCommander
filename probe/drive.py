@@ -86,7 +86,7 @@ USER_SCALE = 0.8
 
 
 def design(x, y):
-    """A point of the 1920x1080 design space, y down as on the concept's boards, to the screen."""
+    """A point of the 1920x1080 design space, y down as on the concept boards, to the screen."""
     left, top, w, h = rect()
     s = min(w / 1920, h / 1080) * USER_SCALE
     return int(left + (w - 1920 * s) / 2 + x * s), int(top + (h - 1080 * s) / 2 + y * s)

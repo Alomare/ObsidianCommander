@@ -3,11 +3,11 @@
 python server.py [--port 17491] [--scenario custom] [--out runs/<time>] [--tls]
 
 The game posts form fields to /1.0/; see docs/protocol.md. Every request goes to requests.jsonl in
-the output folder, with the Steam ticket in `auth` replaced by its size and keys. JSON fields
+the output folder, with the Steam ticket in `auth` replaced by the ticket size and keys. JSON fields
 (planets, statistics, users) are decoded beside the raw text.
 
 Control, from the same machine only:
-  GET  /admin/state              scenario, request count and the war's points
+  GET  /admin/state              scenario, request count and the war points
   POST /admin/scenario?name=...  switch scenario (custom, minimal, replay, error, broken)
 
 --tls serves HTTPS with a throwaway self-signed certificate made by openssl, for the case where the
@@ -123,7 +123,7 @@ def make_handler(probe):
                 self.send_json(413, {"error": "too large"})
                 return
             if url.path.startswith("/commander/"):
-                # The companion mod's own channel (HD2-model probe): echo what arrived.
+                # The companion mod channel (HD2-model probe): echo what arrived.
                 try:
                     got = json.loads(body) if body else None
                 except ValueError:

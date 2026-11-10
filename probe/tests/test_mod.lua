@@ -110,7 +110,7 @@ dofile(MAIN)
 CampaignManager:set_environment()
 check(CampaignManager.url == "http://127.0.0.1:17491/1.0/", "set_environment ends on the probe url")
 SaveManager:setup("steam", "helldivers_save")
-check(SaveManager.system == "default" and SaveManager.name == "cmdprobe_110000100000000", "save goes to the probe's own local file")
+check(SaveManager.system == "default" and SaveManager.name == "cmdprobe_110000100000000", "save goes to the local probe file")
 SaveManager:set_backup_system("default", "helldivers_steam_110000100000000")
 check(SaveManager.backup == nil, "the backup into the real file is skipped")
 TelemetryWwsgaManager:queue_event()
@@ -141,7 +141,7 @@ write(LOGS .. "cmdprobe.cmd", "state\n")
 run_frames(30)
 check((read(LOGS .. "cmdprobe.ack") or ""):find("current_season=1162", 1, true) ~= nil, "state command reports the season")
 
--- The campaign mission: easiest open planet, its other missions done, a non-training launch.
+-- The campaign mission: easiest open planet, the other missions done, a non-training launch.
 SaveManager.data.available_planets = { { current_region = 5, planets = {
 	{ name = "planet_10", difficulty = 4, reward = "xp_boost_1", missions = { { seed = 11 }, { seed = 12 } } },
 	{ name = "planet_11", difficulty = 1, reward = "xp_boost_1", missions = { { seed = 21, num_research_samples = 3 }, { seed = 22 }, { seed = 23, num_research_samples = 4 } } },
@@ -154,7 +154,7 @@ check(launched and launched.name == "transition" and launched.params.wanted_stat
 check(launched and launched.params.is_training == false and launched.params.mission_seed == 23, "the open mission of the easiest non-boss planet, not training")
 check(launched and launched.params.planet_name == "planet_11" and launched.params.planet_region == 5 and launched.params.num_research_samples == 4, "planet, region and samples passed on")
 local p = SaveManager.data.available_planets[1].planets[2]
-check(p.missions[1].completed and p.missions[2].completed and not p.missions[3].completed, "the planet's other missions are marked done")
+check(p.missions[1].completed and p.missions[2].completed and not p.missions[3].completed, "the other missions of the planet are marked done")
 check(SaveManager.data.current_planet.selected_mission_index == 3, "current_planet points at the last mission")
 
 _G.IN_MISSION = true
