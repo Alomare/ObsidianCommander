@@ -3,8 +3,8 @@ game's requests through Obsidian's real relay, the admin API, LAN discovery and 
 
 python tools/e2e.py [--zip internal/builds/obsidian-commander-<v>.zip] [--obsidian <ObsidianLauncher checkout>]
 
-Unpacks the ZIP into a temporary folder, starts the server on a free loopback port, creates a war,
-then:
+Unpacks the ZIP into %TEMP%/cmd-e2e (the same folder each run, so Windows asks about the firewall
+once), starts the server on a free loopback port, creates a war, then:
   1. game requests shaped like protocol.md's samples, as the relay forwards them (no Steam ticket);
   2. Obsidian's relay test against this war (cargo test ... relay_reaches_a_real_war -- --ignored);
   3. GM actions through the admin API, and the state they leave;
@@ -87,7 +87,13 @@ def main():
     if not a.zip:
         sys.exit("no package: run tools/pack.py first")
 
-    work = Path(tempfile.mkdtemp(prefix="cmd-e2e-"))
+    # The same folder each run: Windows keys the firewall answer on the server's path, so a new
+    # folder would ask again at Open to LAN and leave two more rules behind.
+    work = Path(tempfile.gettempdir()) / "cmd-e2e"
+    shutil.rmtree(work, ignore_errors=True)
+    if work.exists():
+        sys.exit(f"{work} is in use: is a server from an earlier run still open?")
+    work.mkdir()
     pkg = work / "package"
     with zipfile.ZipFile(a.zip) as z:
         z.extractall(pkg)
