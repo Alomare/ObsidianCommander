@@ -1,11 +1,11 @@
 // The wars on this server: open one, play one, create or import.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { api } from "../api";
-import { play, selectWar, useHost } from "../bridge";
+import { play, playModel, selectWar, useHost } from "../bridge";
 import { t, tk } from "../strings";
 import type { FrontBrief, Info, WarSummary } from "../types";
 import { enemyName, FACTION_OF } from "../util";
-import { MiniMap } from "../map/MiniMap";
+import { EvoMiniMap, MiniMap } from "../map/MiniMap";
 import { FACTION_ACCENT, HELLDIVER_ACCENT } from "../map/GalaxyMap";
 import { EnemyIcon, ICheck, IChevron, IImport, ILan, IPlay, IPlus, IUsers } from "./Icons";
 import { notify } from "./ui";
@@ -76,7 +76,10 @@ export function WarList({ readOnly, onOpen, onCreate }: { readOnly: boolean; onO
 
 function WarCard({ war, index, playing, gameRunning, readOnly, onOpen }: { war: WarSummary; index: number; playing: boolean; gameRunning: boolean; readOnly: boolean; onOpen: () => void }) {
   const members = Array.isArray(war.members) ? war.members.length : war.members;
-  const fronts = war.fronts ?? [];
+  const evolved = war.model === "evolved";
+  // An Evolved war keeps the Vanilla fronts as they started; they say nothing about it.
+  const fronts = evolved ? [] : war.fronts ?? [];
+  const model = playModel(war.model);
   const lanOpen = typeof war.lan === "boolean" ? war.lan : !!war.lan?.open;
   const lanPort = typeof war.lan === "object" && war.lan ? war.lan.port : null;
   const share = (f: FrontBrief) => f.status === "defeated" ? 1 : f.status === "hidden" ? 0 : f.points != null && f.points_max ? f.points / f.points_max : Math.max(0, (f.region - 1) / 10);
@@ -84,13 +87,13 @@ function WarCard({ war, index, playing, gameRunning, readOnly, onOpen }: { war: 
   return (
     <div className={`war-card${playing ? " playing" : ""}`} style={{ animationDelay: `${index * 50}ms` }} role="button" tabIndex={0} aria-label={t("openWar", { name: war.name })}
       onClick={onOpen} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}>
-      <MiniMap fronts={war.fronts} />
+      {evolved ? <EvoMiniMap owners={war.evolved?.owners} /> : <MiniMap fronts={war.fronts} />}
       <div className="wc-body">
         <div className="wc-name">
           <span className="nm-text">{war.name}</span>
         </div>
         <div className="wc-chips">
-          {war.model && war.model !== "vanilla" && <span className="chip">{war.model}</span>}
+          {war.model && war.model !== "vanilla" && <span className="chip model">{evolved ? t("modelEvolvedShort") : war.model}</span>}
           {war.season != null && <span className="chip" data-tip={t("seasonTip")}>{t("seasonN", { n: war.season })}</span>}
           {war.state && <span className={`chip state ${war.state}`}>{tk(`state_${war.state}`)}</span>}
           {lanOpen && <span className="chip lan" data-tip={lanPort ? t("lanOpenTip", { port: lanPort }) : t("lanTip")}><ILan width={13} height={13} />{t("lanOpen")}</span>}
@@ -109,10 +112,10 @@ function WarCard({ war, index, playing, gameRunning, readOnly, onOpen }: { war: 
         )}
       </div>
       <div className="wc-actions" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-        <button className="btn play" disabled={gameRunning} data-tip={busy ?? (playing ? t("playingTip") : t("playTip"))} onClick={() => play(war.id, war.name)}><IPlay />{t("play")}</button>
+        <button className="btn play" disabled={gameRunning} data-tip={busy ?? (playing ? t("playingTip") : t("playTip"))} onClick={() => play(war.id, war.name, model)}><IPlay />{t("play")}</button>
         {!readOnly && (playing
           ? <button className="btn small selected-btn" disabled data-tip={t("playingTip")}><ICheck />{t("playingShort")}</button>
-          : <button className="btn small" disabled={gameRunning} onClick={() => selectWar(war.id, war.name)} data-tip={busy ?? t("selectTip")}>{t("select")}</button>)}
+          : <button className="btn small" disabled={gameRunning} onClick={() => selectWar(war.id, war.name, model)} data-tip={busy ?? t("selectTip")}>{t("select")}</button>)}
       </div>
       <IChevron className="wc-open" aria-hidden />
     </div>

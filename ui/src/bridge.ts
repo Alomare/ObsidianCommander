@@ -81,13 +81,18 @@ export function useHost(): HostState {
 /** True when a Play press reaches someone: Obsidian, or the mock. */
 export const canPlay = () => embedded || isMock;
 
-export function play(war: string, name: string) {
+/** The war model for Obsidian: "evolved" switches on the companion mod. A Vanilla war sends no `model`
+    field, so older launchers get the same messages as before. */
+export type PlayModel = "evolved" | undefined;
+export const playModel = (model: string | undefined | null): PlayModel => (model === "evolved" ? "evolved" : undefined);
+
+export function play(war: string, name: string, model?: PlayModel) {
   if (!canPlay()) { notify(t("playOutside")); return; }
-  post({ type: "commander:play", war, name });
+  post({ type: "commander:play", war, name, ...(model ? { model } : {}) });
   if (isMock && !embedded) set({ playing: war, gameRunning: true });
 }
-export function selectWar(war: string, name: string) {
-  post({ type: "commander:select", war, name });
+export function selectWar(war: string, name: string, model?: PlayModel) {
+  post({ type: "commander:select", war, name, ...(model ? { model } : {}) });
   if (isMock && !embedded) set({ playing: war });
 }
 export function officialWar() {

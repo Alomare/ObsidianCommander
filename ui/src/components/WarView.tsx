@@ -1,13 +1,16 @@
 // The war: the galaxy overview as the hero, the fronts under it, the clock and tools above, the side panel.
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { api, isMock } from "../api";
-import { play, useHost } from "../bridge";
+import { play, playModel, useHost } from "../bridge";
 import { useNow, useTween, useWarData } from "../hooks";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";
 import { clock, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
+import { evoOf } from "../evolved";
 import { FACTION_ACCENT, GalaxyMap, HELLDIVER_ACCENT, type Selection } from "../map/GalaxyMap";
 import { CommandPanel } from "./CommandPanel";
+import { EvolvedBody } from "./EvolvedView";
+import { EvolvedSettingsDialog } from "./EvolvedSettings";
 import { FeedList, PlayersPanel, SettingsDialog, StatsPanel } from "./Panels";
 import { EnemyIcon, IBack, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, ILan, IList, IMore, IPlay, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
 import { Confirm, MenuButton, Seg, Switch, notify } from "./ui";
@@ -42,13 +45,17 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const [dialog, setDialog] = useState<null | "settings" | "delete" | "lan" | SeasonAsk>(null);
   const [result, setResult] = useState<"won" | "lost">("won");
 
-  const run = useCallback(async (a: GmAction) => {
+  /** A Game Master action; true when the server took it. */
+  const runOk = useCallback(async (a: GmAction): Promise<boolean> => {
     try {
       accept(await api.action(id, a));
+      return true;
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e), true);
+      return false;
     }
   }, [id, accept]);
+  const run = useCallback(async (a: GmAction) => { await runOk(a); }, [runOk]);
 
   const select = useCallback((s: Selection) => { setSelection(s); if (s) setTab("command"); }, []);
 
@@ -83,6 +90,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const serverNow = now / 1000 + offset;
   const nowUnix = running ? serverNow : war.server_time;
   const isPlaying = host.playing === war.id;
+  const evo = evoOf(war);
 
   const exportWar = async () => {
     try {
@@ -114,10 +122,19 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
 
   const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: "command", label: readOnly ? t("overview") : t("command"), icon: readOnly ? <IEye /> : <ICommand /> },
-    { id: "feed", label: t("feed"), icon: <IList /> },
+    { id: "feed", label: evo ? t("dispatches") : t("feed"), icon: <IList /> },
     { id: "players", label: t("players"), icon: <IUsers /> },
     { id: "stats", label: t("statistics"), icon: <IStats /> },
   ];
+  const tabsNav = (
+    <nav className="side-tabs" role="tablist">
+      {tabs.map((x, i) => (
+        <button key={x.id} role="tab" aria-selected={tab === x.id} className={`side-tab${tab === x.id ? " cur" : ""}`} onClick={() => setTab(x.id)} data-tip={`${x.label} (${i + 1})`}>
+          {x.icon}<span className="cap">{x.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
   const playTip = host.gameRunning ? (isPlaying ? t("gameRunning") : t("gameRunningTip")) : isPlaying ? t("playingTip") : t("playTip");
 
   return (
@@ -127,7 +144,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
         <div className="war-title">
           <h1 title={war.name}>{war.name}</h1>
           <div className="wc-chips">
-            {war.model !== "vanilla" && <span className="chip">{war.model}</span>}
+            {war.model !== "vanilla" && <span className="chip model">{war.model === "evolved" ? t("modelEvolvedShort") : war.model}</span>}
             <span className="chip" data-tip={t("seasonTip")}>{t("seasonN", { n: war.season })}</span>
             <span className={`chip state ${war.state}`}>{tk(`state_${war.state}`)}</span>
             {readOnly && <span className="chip ro" data-tip={t("readOnlyTip")}><IEye width={13} height={13} />{t("readOnly")}</span>}
@@ -156,13 +173,16 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
           </div>
         )}
         <div className="play-wrap">
-          <button className={`btn play big${isPlaying ? " selected" : ""}`} disabled={host.gameRunning} onClick={() => play(war.id, war.name)} data-tip={playTip}>
+          <button className={`btn play big${isPlaying ? " selected" : ""}`} disabled={host.gameRunning} onClick={() => play(war.id, war.name, playModel(war.model))} data-tip={playTip}>
             <IPlay />{t("play")}
           </button>
           {isPlaying && <span className="play-note">{host.gameRunning ? t("gameRunning") : t("playing")}</span>}
         </div>
       </header>
 
+      {evo ? (
+        <EvolvedBody war={war} evo={evo} readOnly={readOnly} run={runOk} nowUnix={nowUnix} serverNow={serverNow} tab={tab} setTab={setTab} tabsNav={tabsNav} />
+      ) : (
       <div className="war-body">
         <div className="map-col">
           <div className="map-stage">
@@ -188,13 +208,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
         </div>
 
         <aside className="side">
-          <nav className="side-tabs" role="tablist">
-            {tabs.map((x, i) => (
-              <button key={x.id} role="tab" aria-selected={tab === x.id} className={`side-tab${tab === x.id ? " cur" : ""}`} onClick={() => setTab(x.id)} data-tip={`${x.label} (${i + 1})`}>
-                {x.icon}<span className="cap">{x.label}</span>
-              </button>
-            ))}
-          </nav>
+          {tabsNav}
           <div className="side-body" key={tab}>
             {tab === "command" && <CommandPanel war={war} selection={selection} onSelect={select} names={host.names} readOnly={readOnly} run={run} nowUnix={nowUnix} serverNow={serverNow} onSeason={setDialog} onPlayers={() => setTab("players")} />}
             {tab === "feed" && <FeedList feed={feed} war={war} names={host.names} onSelect={select} />}
@@ -203,9 +217,12 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
           </div>
         </aside>
       </div>
+      )}
 
       {error && <div className="banner floating">{t("offline")}</div>}
-      {dialog === "settings" && <SettingsDialog war={war} onClose={() => setDialog(null)} onSaved={accept} />}
+      {dialog === "settings" && (evo
+        ? <EvolvedSettingsDialog war={war} settings={evo.settings} onClose={() => setDialog(null)} onSaved={accept} />
+        : <SettingsDialog war={war} onClose={() => setDialog(null)} onSaved={accept} />)}
       {dialog === "delete" && (
         <Confirm title={t("deleteWar")} text={t("deleteWarText", { name: war.name })} okLabel={t("delete")} danger onClose={() => setDialog(null)}
           onOk={async () => { try { await api.deleteWar(war.id); onBack(); } catch (e) { notify(e instanceof Error ? e.message : String(e), true); } }} />

@@ -3,6 +3,7 @@
 //! See docs/spec-m1.md (sections 2 to 5) for the contract this follows.
 
 pub mod admin;
+pub mod evolved;
 pub mod game;
 pub mod http;
 pub mod lan;

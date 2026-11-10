@@ -828,3 +828,85 @@ fn lan_listener_serves_only_lan_wars_read_only() {
     );
     h.shutdown();
 }
+
+#[test]
+fn evolved_war_through_the_mod_routes() {
+    let (data, ui) = (temp_dir("evolved"), temp_dir("evolved-ui"));
+    let h = start(&data, &ui);
+    let r = admin(
+        h.port,
+        "POST",
+        "/api/wars",
+        Some(json!({"name": "Evolved Test", "model": "evolved", "evolved": {"campaigns": 2}})),
+    );
+    assert_eq!(r.status, 201, "{}", String::from_utf8_lossy(&r.body));
+    let war = r.json();
+    let id = war["id"].as_str().unwrap().to_string();
+    assert_eq!(war["model"], "evolved");
+    assert_eq!(war["evolved"]["settings"]["campaigns"], 2);
+
+    // The state the mod reads.
+    let s = http(h.port, "GET", &format!("/w/{id}/evolved/state"), &[], b"");
+    assert_eq!(s.status, 200);
+    let s = s.json();
+    assert_eq!(s["owners"].as_array().unwrap().len(), 273);
+    assert_eq!(s["war"]["id"], id.as_str());
+    let campaigns = s["campaigns"].as_array().unwrap();
+    assert_eq!(campaigns.iter().filter(|c| c["kind"] == "liberation").count(), 2);
+    let c = &campaigns[0];
+    let op = &c["operations"][0];
+
+    // A won mission counts once per lobby.
+    let report = json!({"campaign": c["id"], "operation": op["id"], "mission": 0, "success": true,
+                        "lobby": "109775241000000001", "kills": 120, "deaths": 2});
+    let body = report.to_string();
+    let a = http(
+        h.port,
+        "POST",
+        &format!("/w/{id}/evolved/report"),
+        &[("Content-Type", "application/json"), ("X-Commander-Player", PLAYER)],
+        body.as_bytes(),
+    )
+    .json();
+    assert_eq!(a["credited"], true, "{a}");
+    assert!(a["liberation"].as_f64().unwrap() > 0.0);
+    let again = http(
+        h.port,
+        "POST",
+        &format!("/w/{id}/evolved/report"),
+        &[("Content-Type", "application/json"), ("X-Commander-Player", PLAYER)],
+        body.as_bytes(),
+    )
+    .json();
+    assert_eq!(again["credited"], false);
+    let bad = http(h.port, "POST", &format!("/w/{id}/evolved/report"), &[], b"{\"campaign\": 1}");
+    assert_eq!(bad.status, 400);
+
+    // The game polls still answer, and the stock uploads move nothing in an Evolved war.
+    let st = game(h.port, &id, Some(PLAYER), &[("action", "get_campaign_status")]);
+    assert_eq!(st["error_code"], 0);
+
+    // The GM: a dispatch, a defense, an order.
+    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_news", "text": "Hold the line."})));
+    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
+    assert!(r.json()["evolved"]["news"].as_array().unwrap().iter().any(|n| n["text"] == "Hold the line."));
+    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_campaign", "planet": 0, "kind": "defense", "faction": 2, "hours": 2})));
+    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
+    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_order", "kind": "defend", "planets": [0], "hours": 5})));
+    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
+    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_planet", "planet": 9999, "owner": 1})));
+    assert_eq!(r.status, 400);
+
+    // A Vanilla war has no Evolved routes.
+    let v = admin(h.port, "POST", "/api/wars", Some(json!({"name": "Plain"}))).json();
+    let vid = v["id"].as_str().unwrap();
+    assert_eq!(http(h.port, "GET", &format!("/w/{vid}/evolved/state"), &[], b"").status, 404);
+
+    // Saved and loaded back whole.
+    h.shutdown();
+    let h = start(&data, &ui);
+    let s2 = http(h.port, "GET", &format!("/w/{id}/evolved/state"), &[], b"").json();
+    assert_eq!(s2["owners"], s["owners"]);
+    assert!(s2["campaigns"].as_array().unwrap().iter().any(|c| c["kind"] == "defense"));
+    h.shutdown();
+}

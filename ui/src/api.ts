@@ -1,10 +1,10 @@
 // The admin API client (docs/spec-m1.md, section 5). `?mock=1` swaps in the fake server in mock.ts.
 
-import type { FeedEntry, GmAction, Info, Settings, Snapshot, War } from "./types";
+import type { EvoSettings, FeedEntry, GmAction, Info, Settings, Snapshot, War } from "./types";
 
 export interface Api {
   info(): Promise<Info>;
-  createWar(body: { name: string; model: "vanilla"; settings?: Partial<Settings> }): Promise<War>;
+  createWar(body: { name: string; model: "vanilla" | "evolved"; settings?: Partial<Settings>; evolved?: Partial<EvoSettings> }): Promise<War>;
   getWar(id: string): Promise<War>;
   patchWar(id: string, body: { name?: string; settings?: Partial<Settings> }): Promise<War>;
   deleteWar(id: string): Promise<void>;

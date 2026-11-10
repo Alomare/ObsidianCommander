@@ -3,6 +3,7 @@ import { memo } from "react";
 import type { FrontBrief } from "../types";
 import { FACTION_OF } from "../util";
 import { OUTER_R, REGIONS, SUPER_EARTH_R, gameColor } from "./geometry";
+import { PLANETS, RIM, START_OWNERS, ownerColor } from "./galaxy";
 
 function stateOf(fronts: FrontBrief[] | undefined, enemy: number, index: number) {
   const f = fronts?.find((x) => x.enemy === enemy);
@@ -28,6 +29,20 @@ export const MiniMap = memo(function MiniMap({ fronts }: { fronts?: FrontBrief[]
         return <path key={r.id} d={r.path} style={{ fill }} className="mm-region" />;
       })}
       <circle r={SUPER_EARTH_R} className="mm-se" />
+    </svg>
+  );
+});
+
+/** The Evolved galaxy in small: planet territories by owner, the starting owners when none are given. */
+export const EvoMiniMap = memo(function EvoMiniMap({ owners }: { owners?: number[] }) {
+  const own = owners && owners.length === PLANETS.length ? owners : START_OWNERS;
+  const R = RIM + 10;
+  return (
+    <svg className="minimap" viewBox={`${-R} ${-R} ${R * 2} ${R * 2}`} aria-hidden>
+      <circle r={RIM + 6} className="mm-back" />
+      {PLANETS.map((p) => <path key={p.id} d={p.cell} style={{ fill: ownerColor(own[p.id], own[p.id] === 0 ? 0.32 : 0.62) }} className="mm-cell" />)}
+      <circle r={RIM} className="mm-rim" />
+      <circle r={30} className="mm-se" />
     </svg>
   );
 });

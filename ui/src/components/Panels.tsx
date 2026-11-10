@@ -110,7 +110,7 @@ export function StatsPanel({ war, history, nowUnix }: { war: War; history: Snaps
   );
 }
 
-function Tile({ label, value, sub, tip }: { label: string; value: string; sub?: string; tip?: string }) {
+export function Tile({ label, value, sub, tip }: { label: string; value: string; sub?: string; tip?: string }) {
   return (
     <div className="tile" data-tip={tip}>
       <span className="tile-label">{label}</span>

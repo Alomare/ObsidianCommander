@@ -152,9 +152,14 @@ fn clean_player(raw: Option<&str>) -> String {
         .unwrap_or_else(|| "local".into())
 }
 
-/// `/w/<id>/1.0/`
+/// `/w/<id>/1.0/`, and `/w/<id>/evolved/...` for the Evolved War Engine mod.
 fn game_route(app: &Arc<App>, req: &Req, via: Via, rest: &str) -> Resp {
     let rest = rest.trim_end_matches('/');
+    if let Some((id, tail)) = rest.split_once('/')
+        && let Some(what) = tail.strip_prefix("evolved")
+    {
+        return evolved_route(app, req, via, id, what.trim_start_matches('/'));
+    }
     let Some((id, "1.0")) = rest.split_once('/') else {
         return Resp::not_found();
     };
@@ -184,6 +189,67 @@ fn game_route(app: &Arc<App>, req: &Req, via: Via, rest: &str) -> Resp {
     }
     app.commit(slot, out, now);
     Resp::json(200, &answer)
+}
+
+/// The Evolved War Engine mod reaches these through the Obsidian relay: `GET state` (the war as
+/// the mod draws it), `POST report` (a mission result, JSON) and `GET galaxy` (the map data).
+fn evolved_route(app: &Arc<App>, req: &Req, via: Via, id: &str, what: &str) -> Resp {
+    let now = now_unix();
+    let mut wars = app.wars();
+    let Some(slot) = wars.get_mut(id) else {
+        return Resp::not_found();
+    };
+    if via == Via::Lan && !slot.lan_open {
+        return Resp::not_found();
+    }
+    if !slot.war.is_evolved() {
+        return Resp::error(404, "not an Evolved war");
+    }
+    match (req.method.as_str(), what) {
+        ("GET", "galaxy") => Resp {
+            status: 200,
+            content_type: "application/json",
+            body: crate::evolved::GALAXY_JSON.as_bytes().to_vec(),
+            headers: vec![("Cache-Control", "max-age=3600".into())],
+        },
+        ("GET", "state") => {
+            let w = &slot.war;
+            let Some(e) = w.evolved.as_ref() else {
+                return Resp::not_found();
+            };
+            let mut v = e.view(w.war_time, w.speed);
+            v["war"] = json!({"id": w.id, "name": w.name, "season": w.season, "state": w.state.as_str(),
+                              "war_time": w.war_time, "speed": w.speed, "server_time": now});
+            Resp::json(200, &v)
+        }
+        ("POST", "report") => {
+            let report: crate::evolved::Report = match serde_json::from_slice(&req.body) {
+                Ok(r) => r,
+                Err(e) => return Resp::error(400, &format!("bad report: {e}")),
+            };
+            let player = clean_player(req.header("X-Commander-Player"));
+            let name = req
+                .header("X-Commander-Name")
+                .map(|n| percent_decode(n).unwrap_or_else(|| n.to_string()));
+            let mut out = crate::rules::Out::default();
+            let war_time = slot.war.war_time;
+            let answer = {
+                let mut dice = app.dice.lock().unwrap_or_else(|e| e.into_inner());
+                let Some(e) = slot.war.evolved.as_mut() else {
+                    return Resp::not_found();
+                };
+                e.report(&player, &report, war_time, now, &mut *dice, &mut out)
+            };
+            slot.war.touch_member(&player, name.as_deref(), now, &mut out);
+            app.log.line(&format!(
+                "war {id}: evolved report from {player} campaign {} operation {} mission {} success {} -> {}",
+                report.campaign, report.operation, report.mission, report.success, answer
+            ));
+            app.commit(slot, out, now);
+            Resp::json(200, &answer)
+        }
+        _ => Resp::not_found(),
+    }
 }
 
 // ---------------------------------------------------------------- static files

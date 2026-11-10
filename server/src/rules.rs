@@ -399,6 +399,10 @@ pub struct War {
     pub season_start_war: f64,
     pub season_start_time: i64,
     pub last_snapshot_hour: i64,
+    /// The Evolved war state, for a war of model "evolved". The fronts above then stay as they
+    /// started: the game still asks for them, and the Evolved War Engine mod draws this instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evolved: Option<crate::evolved::Evolved>,
 }
 
 // ---------------------------------------------------------------- effects
@@ -526,6 +530,7 @@ impl War {
             season_start_war: 0.0,
             season_start_time: now,
             last_snapshot_hour: 0,
+            evolved: None,
         };
         let mut out = Out {
             snapshot: true,
@@ -534,6 +539,27 @@ impl War {
         };
         out.push(Feed::new("season", "season_started").value(season as f64));
         (war, out)
+    }
+
+    /// A new Evolved war: the HELLDIVERS 2 galaxy with campaigns, operations and Major Orders.
+    pub fn new_evolved(
+        id: &str,
+        name: &str,
+        settings: Settings,
+        evo: crate::evolved::EvoSettings,
+        now: i64,
+        dice: &mut dyn Dice,
+    ) -> (War, Out) {
+        let (mut war, mut out) = War::new(id, name, settings, now, dice);
+        war.model = "evolved".into();
+        let mut e = crate::evolved::Evolved::new(evo);
+        e.start(0.0, now, dice, &mut out);
+        war.evolved = Some(e);
+        (war, out)
+    }
+
+    pub fn is_evolved(&self) -> bool {
+        self.evolved.is_some()
     }
 
     // ---- lookups
@@ -628,6 +654,16 @@ impl War {
         }
         self.war_time += dt;
         out.changed = true;
+
+        if let Some(e) = self.evolved.as_mut() {
+            e.tick(self.war_time, dt, now, dice, out);
+            let hour = (self.war_time / 3600.0).floor() as i64;
+            if hour != self.last_snapshot_hour {
+                self.last_snapshot_hour = hour;
+                out.snapshot = true;
+            }
+            return;
+        }
 
         for front in 0..ENEMIES {
             let f = &self.fronts[front];
@@ -1138,8 +1174,10 @@ impl War {
 
     // ---- what the game sends
 
+    /// Whether the in-game uploads move the war. An Evolved war counts only the reports of the
+    /// Evolved War Engine mod, which name the planet and the operation.
     fn crediting(&self) -> bool {
-        !self.state.ended()
+        !self.state.ended() && self.evolved.is_none()
     }
 
     /// A completed planet. `front` is 0-based here: the caller has already turned the 1-based in-game
@@ -1513,6 +1551,7 @@ impl War {
             "members": members,
             "settings": self.settings,
             "past_seasons": self.past_seasons.iter().map(|p| json!({"season": p.season, "result": p.result, "ended": p.ended})).collect::<Vec<_>>(),
+            "evolved": self.evolved.as_ref().map(|e| e.view(self.war_time, self.speed)),
             "lan": {"open": lan_open, "port": if lan_open { lan_port } else { None }},
             "server_time": now,
         })
