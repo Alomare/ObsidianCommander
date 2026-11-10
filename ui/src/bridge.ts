@@ -1,0 +1,99 @@
+// Talking to Obsidian, which shows this page in an iframe (spec section 6). Only messages from the parent
+// window count, and every field is checked before use.
+
+import { useSyncExternalStore } from "react";
+import { isMock } from "./api";
+import { notify } from "./components/ui";
+import { t } from "./strings";
+
+export interface HostState {
+  inObsidian: boolean;
+  theme: "dark" | "light";
+  lang: string;
+  names: Record<string, string>;
+  playing: string | null;
+  gameRunning: boolean;
+}
+
+const params = new URLSearchParams(location.search);
+const embedded = window.parent !== window;
+
+let state: HostState = {
+  inObsidian: false,
+  theme: params.get("theme") === "light" ? "light" : "dark",
+  lang: "en",
+  names: {},
+  playing: isMock ? params.get("playing") : null,
+  gameRunning: false,
+};
+const subs = new Set<() => void>();
+function set(patch: Partial<HostState>) {
+  state = { ...state, ...patch };
+  document.documentElement.dataset.theme = state.theme;
+  subs.forEach((f) => f());
+}
+
+const str = (v: unknown, max = 200): string | null => (typeof v === "string" && v.length <= max ? v : null);
+
+function onMessage(e: MessageEvent) {
+  if (!embedded || e.source !== window.parent) return;
+  const d = e.data;
+  if (!d || typeof d !== "object" || typeof d.type !== "string") return;
+  const patch: Partial<HostState> = {};
+  if ("playing" in d) patch.playing = d.playing === null ? null : str(d.playing, 64);
+  if (typeof d.game_running === "boolean") patch.gameRunning = d.game_running;
+  if (d.type === "obsidian:hello") {
+    patch.inObsidian = true;
+    if (d.theme === "dark" || d.theme === "light") patch.theme = d.theme;
+    const lang = str(d.lang, 16);
+    if (lang) patch.lang = lang;
+    if (d.names && typeof d.names === "object" && !Array.isArray(d.names)) {
+      const names: Record<string, string> = {};
+      for (const [k, v] of Object.entries(d.names)) {
+        const s = str(v, 120);
+        if (/^[a-z0-9_]{1,64}$/.test(k) && s) names[k] = s;
+      }
+      patch.names = names;
+    }
+    set(patch);
+  } else if (d.type === "obsidian:state") {
+    set(patch);
+  }
+}
+
+function post(msg: Record<string, unknown>) {
+  if (embedded) window.parent.postMessage(msg, "*");
+}
+
+export function startBridge() {
+  document.documentElement.dataset.theme = state.theme;
+  window.addEventListener("message", onMessage);
+  post({ type: "commander:ready" });
+}
+
+export function useHost(): HostState {
+  return useSyncExternalStore(
+    (f) => { subs.add(f); return () => subs.delete(f); },
+    () => state,
+  );
+}
+
+/** True when a Play press reaches someone: Obsidian, or the mock. */
+export const canPlay = () => embedded || isMock;
+
+export function play(war: string, name: string) {
+  if (!canPlay()) { notify(t("playOutside")); return; }
+  post({ type: "commander:play", war, name });
+  if (isMock && !embedded) set({ playing: war, gameRunning: true });
+}
+export function selectWar(war: string, name: string) {
+  post({ type: "commander:select", war, name });
+  if (isMock && !embedded) set({ playing: war });
+}
+export function officialWar() {
+  post({ type: "commander:official" });
+  if (isMock && !embedded) set({ playing: null, gameRunning: false });
+}
+export function setThemeForDev(theme: "dark" | "light") {
+  set({ theme });
+}

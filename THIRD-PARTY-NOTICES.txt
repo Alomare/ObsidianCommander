@@ -1,0 +1,13 @@
+Obsidian Commander uses these works by others.
+
+Server (Rust crates, each under the MIT License or the Apache License 2.0, at the user's choice):
+  tiny_http, serde, serde_json, form_urlencoded, and the crates they depend on.
+
+Interface:
+  React and ReactDOM, MIT License, Copyright (c) Meta Platforms, Inc. and affiliates.
+  Saira, SIL Open Font License 1.1, Copyright 2018 The Saira Project Authors (via @fontsource-variable/saira).
+  Barlow, SIL Open Font License 1.1, Copyright 2017 The Barlow Project Authors (via @fontsource/barlow).
+
+The war map's shape (data/warfront.json) is a list of grid cells and colours read from HELLDIVERS'
+own settings. HELLDIVERS is a trademark of Sony Interactive Entertainment; Obsidian Commander is a
+fan project, not made or endorsed by Arrowhead Game Studios or Sony.

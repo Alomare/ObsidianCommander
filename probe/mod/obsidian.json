@@ -1,0 +1,11 @@
+{
+  "obsidian": 1,
+  "id": "obsidian.cmdprobe",
+  "version": "0.1.0",
+  "name": { "en": "Commander probe" },
+  "description": { "en": "Test harness, not for players. Points the Galactic War at a local test server, keeps the save apart from the real one, and writes what the game does with the answers to logs/cmdprobe.log. Does nothing without logs/cmdprobe.cfg." },
+  "authors": ["Alomare"],
+  "scope": "client",
+  "entry": "main.lua",
+  "requires": ["obsidian.api"]
+}

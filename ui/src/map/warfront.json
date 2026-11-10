@@ -1,0 +1,1227 @@
+{
+ "warfront_info": {
+  "grid_angular_size": 48,
+  "grid_radial_size": 11,
+  "grid_radius": 2,
+  "warfronts": {
+   "bugs": [
+    {
+     "background": 1,
+     "city_name": "city_01",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_01",
+     "name": "region_bugs_01",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       33,
+       0,
+       14
+      ],
+      [
+       37,
+       1,
+       10
+      ]
+     ],
+     "seed": 1928547289
+    },
+    {
+     "background": 3,
+     "city_name": "city_02",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_02",
+     "name": "region_bugs_02",
+     "object_sets": [
+      "background_3"
+     ],
+     "region": [
+      [
+       33,
+       1,
+       5
+      ],
+      [
+       34,
+       2,
+       7
+      ]
+     ],
+     "seed": 2950193572
+    },
+    {
+     "background": 3,
+     "city_name": "city_03",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_03",
+     "name": "region_bugs_03",
+     "object_sets": [
+      "background_3"
+     ],
+     "region": [
+      [
+       41,
+       2,
+       5
+      ],
+      [
+       41,
+       3,
+       5
+      ]
+     ],
+     "seed": 1829501829
+    },
+    {
+     "background": 4,
+     "city_name": "city_04",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_04",
+     "name": "region_bugs_04",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       34,
+       3,
+       7
+      ],
+      [
+       33,
+       4,
+       8
+      ]
+     ],
+     "seed": 5019295710
+    },
+    {
+     "background": 1,
+     "city_name": "city_05",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_05",
+     "name": "region_bugs_05",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       41,
+       4,
+       6
+      ],
+      [
+       36,
+       5,
+       11
+      ]
+     ],
+     "seed": 9590105929
+    },
+    {
+     "background": 2,
+     "city_name": "city_06",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_06",
+     "name": "region_bugs_06",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       33,
+       5,
+       3
+      ],
+      [
+       34,
+       6,
+       7
+      ],
+      [
+       34,
+       7,
+       6
+      ]
+     ],
+     "seed": 2719230592
+    },
+    {
+     "background": 4,
+     "city_name": "city_07",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_07",
+     "name": "region_bugs_07",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       41,
+       6,
+       4
+      ],
+      [
+       40,
+       7,
+       5
+      ]
+     ],
+     "seed": 6185910583
+    },
+    {
+     "background": 3,
+     "city_name": "city_08",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_08",
+     "name": "region_bugs_08",
+     "object_sets": [
+      "background_3"
+     ],
+     "region": [
+      [
+       45,
+       6,
+       2
+      ],
+      [
+       45,
+       7,
+       1
+      ],
+      [
+       41,
+       8,
+       5
+      ]
+     ],
+     "seed": 1920591872
+    },
+    {
+     "background": 2,
+     "city_name": "city_09",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_09",
+     "name": "region_bugs_09",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       33,
+       8,
+       8
+      ],
+      [
+       33,
+       9,
+       6
+      ]
+     ],
+     "seed": 5729102058
+    },
+    {
+     "background": 1,
+     "city_name": "city_10",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_10",
+     "name": "region_bugs_10",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       38,
+       9,
+       8
+      ]
+     ],
+     "seed": 3728195320
+    },
+    {
+     "attack_info": [
+      0,
+      3,
+      3,
+      101
+     ],
+     "background": 4,
+     "city_name": "city_bug_hq",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "bugs_region_hq",
+     "name": "region_bugs_hq",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       33,
+       10,
+       14
+      ]
+     ],
+     "seed": 5010295710
+    }
+   ],
+   "cyborgs": [
+    {
+     "background": 2,
+     "city_name": "city_11",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_01",
+     "name": "region_cyborgs_01",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       1,
+       0,
+       14
+      ],
+      [
+       2,
+       1,
+       5
+      ]
+     ],
+     "seed": 7283929195
+    },
+    {
+     "background": 4,
+     "city_name": "city_12",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_02",
+     "name": "region_cyborgs_02",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       6,
+       1,
+       5
+      ],
+      [
+       1,
+       2,
+       10
+      ]
+     ],
+     "seed": 9019259015
+    },
+    {
+     "background": 1,
+     "city_name": "city_13",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_03",
+     "name": "region_cyborgs_03",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       11,
+       1,
+       3
+      ],
+      [
+       11,
+       2,
+       4
+      ],
+      [
+       10,
+       3,
+       5
+      ],
+      [
+       6,
+       4,
+       9
+      ]
+     ],
+     "seed": 8390193857
+    },
+    {
+     "background": 3,
+     "city_name": "city_14",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_04",
+     "name": "region_cyborgs_04",
+     "object_sets": [
+      "background_3"
+     ],
+     "region": [
+      [
+       1,
+       3,
+       9
+      ],
+      [
+       4,
+       4,
+       2
+      ]
+     ],
+     "seed": 5782910581
+    },
+    {
+     "background": 4,
+     "city_name": "city_15",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_05",
+     "name": "region_cyborgs_05",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       1,
+       4,
+       3
+      ],
+      [
+       2,
+       5,
+       6
+      ],
+      [
+       2,
+       6,
+       3
+      ]
+     ],
+     "seed": 1235799200
+    },
+    {
+     "background": 2,
+     "city_name": "city_16",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_06",
+     "name": "region_cyborgs_06",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       8,
+       5,
+       5
+      ],
+      [
+       5,
+       6,
+       8
+      ]
+     ],
+     "seed": 2810502895
+    },
+    {
+     "background": 4,
+     "city_name": "city_17",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_07",
+     "name": "region_cyborgs_07",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       13,
+       5,
+       2
+      ],
+      [
+       13,
+       6,
+       2
+      ],
+      [
+       8,
+       7,
+       6
+      ]
+     ],
+     "seed": 2851058230
+    },
+    {
+     "background": 2,
+     "city_name": "city_18",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_08",
+     "name": "region_cyborgs_08",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       1,
+       7,
+       7
+      ],
+      [
+       1,
+       8,
+       6
+      ]
+     ],
+     "seed": 5627819502
+    },
+    {
+     "background": 2,
+     "city_name": "city_19",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_09",
+     "name": "region_cyborgs_09",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       8,
+       8,
+       6
+      ],
+      [
+       8,
+       9,
+       7
+      ]
+     ],
+     "seed": 2918501982
+    },
+    {
+     "background": 1,
+     "city_name": "city_20",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_10",
+     "name": "region_cyborgs_10",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       7,
+       8,
+       1
+      ],
+      [
+       1,
+       9,
+       7
+      ]
+     ],
+     "seed": 7829105929
+    },
+    {
+     "attack_info": [
+      2,
+      4,
+      4,
+      101
+     ],
+     "background": 1,
+     "city_name": "city_cyborg_hq",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "cyborgs_region_hq",
+     "name": "region_cyborgs_hq",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       1,
+       10,
+       14
+      ]
+     ],
+     "seed": 5817291502
+    }
+   ],
+   "illuminates": [
+    {
+     "background": 3,
+     "city_name": "city_21",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_01",
+     "name": "region_illuminates_01",
+     "object_sets": [
+      "background_3"
+     ],
+     "region": [
+      [
+       17,
+       0,
+       14
+      ],
+      [
+       17,
+       1,
+       8
+      ]
+     ],
+     "seed": 1578291052
+    },
+    {
+     "background": 2,
+     "city_name": "city_22",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_02",
+     "name": "region_illuminates_02",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       25,
+       1,
+       6
+      ],
+      [
+       18,
+       2,
+       10
+      ],
+      [
+       18,
+       3,
+       7
+      ]
+     ],
+     "seed": 5329803102
+    },
+    {
+     "background": 1,
+     "city_name": "city_23",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_03",
+     "name": "region_illuminates_03",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       28,
+       2,
+       3
+      ],
+      [
+       25,
+       3,
+       6
+      ],
+      [
+       24,
+       4,
+       6
+      ],
+      [
+       24,
+       5,
+       3
+      ]
+     ],
+     "seed": 2351501570
+    },
+    {
+     "background": 4,
+     "city_name": "city_24",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_04",
+     "name": "region_illuminates_04",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       20,
+       4,
+       4
+      ],
+      [
+       20,
+       5,
+       4
+      ],
+      [
+       20,
+       6,
+       7
+      ]
+     ],
+     "seed": 5715056292
+    },
+    {
+     "background": 2,
+     "city_name": "city_25",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_05",
+     "name": "region_illuminates_05",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       17,
+       4,
+       3
+      ],
+      [
+       17,
+       5,
+       3
+      ],
+      [
+       18,
+       6,
+       2
+      ],
+      [
+       18,
+       7,
+       2
+      ]
+     ],
+     "seed": 5719820105
+    },
+    {
+     "background": 1,
+     "city_name": "city_26",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_06",
+     "name": "region_illuminates_06",
+     "object_sets": [
+      "background_1"
+     ],
+     "region": [
+      [
+       20,
+       7,
+       1
+      ],
+      [
+       17,
+       8,
+       4
+      ],
+      [
+       17,
+       9,
+       4
+      ]
+     ],
+     "seed": 6571950292
+    },
+    {
+     "background": 3,
+     "city_name": "city_27",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_07",
+     "name": "region_illuminates_07",
+     "object_sets": [
+      "background_3"
+     ],
+     "region": [
+      [
+       27,
+       5,
+       3
+      ],
+      [
+       27,
+       6,
+       3
+      ],
+      [
+       25,
+       7,
+       6
+      ]
+     ],
+     "seed": 9859102222
+    },
+    {
+     "background": 2,
+     "city_name": "city_28",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_08",
+     "name": "region_illuminates_08",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       21,
+       7,
+       4
+      ],
+      [
+       21,
+       8,
+       6
+      ]
+     ],
+     "seed": 3333378291
+    },
+    {
+     "background": 4,
+     "city_name": "city_29",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_09",
+     "name": "region_illuminates_09",
+     "object_sets": [
+      "background_4"
+     ],
+     "region": [
+      [
+       27,
+       8,
+       4
+      ],
+      [
+       26,
+       9,
+       5
+      ]
+     ],
+     "seed": 5555378195
+    },
+    {
+     "background": 3,
+     "city_name": "city_30",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_10",
+     "name": "region_illuminates_10",
+     "object_sets": [
+      "background_3"
+     ],
+     "region": [
+      [
+       21,
+       9,
+       5
+      ]
+     ],
+     "seed": 2228175912
+    },
+    {
+     "attack_info": [
+      1,
+      5,
+      5,
+      101
+     ],
+     "background": 2,
+     "city_name": "city_illuminate_hq",
+     "defend_info": [
+      4,
+      0,
+      0,
+      101
+     ],
+     "mesh": "illuminates_region_hq",
+     "name": "region_illuminates_hq",
+     "object_sets": [
+      "background_2"
+     ],
+     "region": [
+      [
+       17,
+       10,
+       14
+      ]
+     ],
+     "seed": 9918295819
+    }
+   ],
+   "superearth": {
+    "background": 3,
+    "city_name": "city_superearth",
+    "defend_info": [
+     4,
+     1,
+     1,
+     101
+    ],
+    "mesh": "superearth_region",
+    "name": "region_superearth_01",
+    "object_sets": [
+     "background_3"
+    ],
+    "region": [
+     [
+      0,
+      0,
+      0
+     ]
+    ],
+    "seed": 1293871254
+   }
+  }
+ },
+ "colors": {
+  "bugs": {
+   "active_border_color": [
+    200,
+    70,
+    200,
+    160
+   ],
+   "active_fill_color": [
+    250,
+    70,
+    220,
+    160
+   ],
+   "bar_color": [
+    170,
+    30,
+    30
+   ],
+   "border_color": [
+    80,
+    70,
+    180,
+    160
+   ],
+   "fill_color": [
+    50,
+    70,
+    180,
+    160
+   ],
+   "hq_border_color": [
+    120,
+    100,
+    200,
+    160
+   ],
+   "hq_fill_color": [
+    140,
+    50,
+    230,
+    130
+   ]
+  },
+  "cyborgs": {
+   "active_border_color": [
+    200,
+    200,
+    90,
+    60
+   ],
+   "active_fill_color": [
+    250,
+    210,
+    80,
+    80
+   ],
+   "bar_color": [
+    170,
+    30,
+    30
+   ],
+   "border_color": [
+    70,
+    210,
+    100,
+    50
+   ],
+   "fill_color": [
+    80,
+    230,
+    130,
+    80
+   ],
+   "hq_border_color": [
+    170,
+    240,
+    60,
+    60
+   ],
+   "hq_fill_color": [
+    160,
+    240,
+    90,
+    60
+   ]
+  },
+  "helldivers": {
+   "active_border_color": [
+    250,
+    255,
+    170,
+    20
+   ],
+   "active_fill_color": [
+    240,
+    200,
+    200,
+    0
+   ],
+   "bar_color": [
+    255,
+    170,
+    20
+   ],
+   "border_color": [
+    250,
+    255,
+    170,
+    20
+   ],
+   "fill_color": [
+    230,
+    255,
+    170,
+    20
+   ],
+   "hq_border_color": [
+    250,
+    255,
+    170,
+    20
+   ],
+   "hq_fill_color": [
+    230,
+    255,
+    170,
+    20
+   ]
+  },
+  "hidden": {
+   "border_color": [
+    50,
+    40,
+    140,
+    170
+   ],
+   "fill_color": [
+    20,
+    40,
+    140,
+    170
+   ]
+  },
+  "illuminates": {
+   "active_border_color": [
+    200,
+    40,
+    130,
+    190
+   ],
+   "active_fill_color": [
+    255,
+    40,
+    150,
+    250
+   ],
+   "bar_color": [
+    170,
+    30,
+    30
+   ],
+   "border_color": [
+    70,
+    40,
+    140,
+    170
+   ],
+   "fill_color": [
+    60,
+    40,
+    140,
+    170
+   ],
+   "hq_border_color": [
+    150,
+    80,
+    100,
+    280
+   ],
+   "hq_fill_color": [
+    140,
+    140,
+    100,
+    220
+   ]
+  },
+  "infobox_text": {
+   "not_selected": [
+    255,
+    150,
+    150,
+    150
+   ],
+   "selected": [
+    255,
+    255,
+    255,
+    255
+   ]
+  }
+ }
+}

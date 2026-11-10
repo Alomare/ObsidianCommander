@@ -1,0 +1,294 @@
+//! Requests in, answers out: the router shared by the loopback and LAN listeners, and static files.
+
+use crate::{App, admin, game, now_unix};
+use serde_json::{Value, json};
+use std::collections::HashMap;
+use std::io::Read;
+use std::net::{SocketAddr, TcpStream};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+
+pub const MAX_BODY: u64 = 8 * 1024 * 1024;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Via {
+    Loopback,
+    Lan,
+}
+
+pub struct Req {
+    pub method: String,
+    pub path: String,
+    pub query: HashMap<String, String>,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
+impl Req {
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
+}
+
+pub struct Resp {
+    pub status: u16,
+    pub content_type: &'static str,
+    pub body: Vec<u8>,
+    pub headers: Vec<(&'static str, String)>,
+}
+
+impl Resp {
+    pub fn json(status: u16, v: &Value) -> Resp {
+        Resp {
+            status,
+            content_type: "application/json",
+            body: serde_json::to_vec(v).unwrap_or_default(),
+            headers: vec![("Cache-Control", "no-store".into())],
+        }
+    }
+    pub fn error(status: u16, msg: &str) -> Resp {
+        Resp::json(status, &json!({"error": msg}))
+    }
+    pub fn not_found() -> Resp {
+        Resp::error(404, "not found")
+    }
+}
+
+/// Wakes a tiny_http accept thread after its server was dropped.
+pub fn unblock_accept(addr: SocketAddr) {
+    if let Ok(s) = TcpStream::connect_timeout(&addr, Duration::from_millis(300)) {
+        let _ = s.shutdown(std::net::Shutdown::Both);
+    }
+}
+
+pub fn serve(app: &Arc<App>, server: &tiny_http::Server, via: Via, stop: &AtomicBool) {
+    while !stop.load(Ordering::SeqCst) {
+        match server.recv_timeout(Duration::from_millis(250)) {
+            Ok(Some(req)) => handle(app, req, via),
+            Ok(None) => {}
+            Err(_) => break,
+        }
+    }
+}
+
+fn split_url(url: &str) -> (String, HashMap<String, String>) {
+    let (path, query) = url.split_once('?').unwrap_or((url, ""));
+    let query = form_urlencoded::parse(query.as_bytes())
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    (path.to_string(), query)
+}
+
+fn handle(app: &Arc<App>, mut raw: tiny_http::Request, via: Via) {
+    let (path, query) = split_url(raw.url());
+    let headers = raw
+        .headers()
+        .iter()
+        .map(|h| {
+            (
+                h.field.as_str().as_str().to_string(),
+                h.value.as_str().to_string(),
+            )
+        })
+        .collect();
+    let mut body = Vec::new();
+    let too_big = raw
+        .as_reader()
+        .take(MAX_BODY + 1)
+        .read_to_end(&mut body)
+        .is_err()
+        || body.len() as u64 > MAX_BODY;
+    let req = Req {
+        method: raw.method().as_str().to_ascii_uppercase(),
+        path,
+        query,
+        headers,
+        body,
+    };
+    let resp = if too_big {
+        Resp::error(413, "request too large")
+    } else {
+        route(app, &req, via)
+    };
+    let mut r = tiny_http::Response::from_data(resp.body).with_status_code(resp.status);
+    if let Ok(h) = tiny_http::Header::from_bytes("Content-Type", resp.content_type) {
+        r.add_header(h);
+    }
+    for (k, v) in resp.headers {
+        if let Ok(h) = tiny_http::Header::from_bytes(k, v.as_bytes()) {
+            r.add_header(h);
+        }
+    }
+    let _ = raw.respond(r);
+}
+
+pub fn route(app: &Arc<App>, req: &Req, via: Via) -> Resp {
+    if let Some(rest) = req.path.strip_prefix("/w/") {
+        return game_route(app, req, via, rest);
+    }
+    if req.path == "/api" || req.path.starts_with("/api/") {
+        return admin::route(app, req, via);
+    }
+    if req.method == "GET" || req.method == "HEAD" {
+        return static_route(app, req, via);
+    }
+    Resp::not_found()
+}
+
+fn clean_player(raw: Option<&str>) -> String {
+    raw.map(str::trim)
+        .filter(|p| {
+            !p.is_empty()
+                && p.len() <= 64
+                && p.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        })
+        .map(str::to_string)
+        .unwrap_or_else(|| "local".into())
+}
+
+/// `/w/<id>/1.0/`
+fn game_route(app: &Arc<App>, req: &Req, via: Via, rest: &str) -> Resp {
+    let rest = rest.trim_end_matches('/');
+    let Some((id, "1.0")) = rest.split_once('/') else {
+        return Resp::not_found();
+    };
+    if req.method != "POST" {
+        return Resp::error(405, "POST only");
+    }
+    let now = now_unix();
+    let fields = game::parse_form(&req.body);
+    let player = clean_player(req.header("X-Commander-Player"));
+    let name = req
+        .header("X-Commander-Name")
+        .map(|n| percent_decode(n).unwrap_or_else(|| n.to_string()));
+    let mut wars = app.wars();
+    let Some(slot) = wars.get_mut(id) else {
+        return Resp::not_found();
+    };
+    if via == Via::Lan && !slot.lan_open {
+        return Resp::not_found();
+    }
+    let (answer, out) = game::handle(slot, &fields, &player, name.as_deref(), now);
+    let action = fields.get("action").map(String::as_str).unwrap_or("");
+    if !action.starts_with("get_") {
+        app.log.line(&format!(
+            "war {id}: {action} from {player} -> error_code {}",
+            answer["error_code"]
+        ));
+    }
+    app.commit(slot, out, now);
+    Resp::json(200, &answer)
+}
+
+// ---------------------------------------------------------------- static files
+
+pub fn percent_decode(s: &str) -> Option<String> {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' {
+            let hex = std::str::from_utf8(b.get(i + 1..i + 3)?).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+pub fn content_type(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("html" | "htm") => "text/html; charset=utf-8",
+        Some("js" | "mjs") => "text/javascript; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        Some("json" | "map") => "application/json",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("ico") => "image/x-icon",
+        Some("woff") => "font/woff",
+        Some("woff2") => "font/woff2",
+        Some("ttf") => "font/ttf",
+        Some("otf") => "font/otf",
+        Some("wasm") => "application/wasm",
+        Some("txt") => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    }
+}
+
+/// The file under `root` that a URL path names, refusing anything that climbs out.
+fn safe_join(root: &Path, url_path: &str) -> Option<PathBuf> {
+    let decoded = percent_decode(url_path)?;
+    let mut p = root.to_path_buf();
+    for seg in decoded.split('/').filter(|s| !s.is_empty()) {
+        if seg == "." || seg == ".." || seg.contains(['\\', ':', '\0']) {
+            return None;
+        }
+        p.push(seg);
+    }
+    Some(p)
+}
+
+fn file_resp(path: &Path) -> Option<Resp> {
+    if !path.is_file() {
+        return None;
+    }
+    let body = std::fs::read(path).ok()?;
+    let html = path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("html"));
+    Some(Resp {
+        status: 200,
+        content_type: content_type(path),
+        body,
+        headers: if html {
+            vec![("Cache-Control", "no-cache".into())]
+        } else {
+            vec![]
+        },
+    })
+}
+
+fn static_route(app: &App, req: &Req, via: Via) -> Resp {
+    let root = &app.cfg.ui;
+    let index = || {
+        file_resp(&root.join("index.html"))
+            .unwrap_or_else(|| Resp::error(404, "the interface folder has no index.html"))
+    };
+    let path = req.path.as_str();
+    if path == "/" || path == "/index.html" {
+        return index();
+    }
+    let is_asset = path.starts_with("/assets/");
+    if via == Via::Lan && !is_asset {
+        return Resp::not_found();
+    }
+    let Some(file) = safe_join(root, path) else {
+        return Resp::not_found();
+    };
+    if let Some(r) = file_resp(&file) {
+        return r;
+    }
+    // SPA fallback: routes without a file extension get the interface.
+    let last = path.rsplit('/').next().unwrap_or("");
+    if !is_asset && !last.contains('.') {
+        return index();
+    }
+    Resp::not_found()
+}
