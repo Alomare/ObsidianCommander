@@ -2,6 +2,7 @@
 // ObsidianLauncher's internal/tools/walk/walk_exe.mjs (WebView2's debugging port, real mouse events).
 //
 //   OBSIDIAN_EXE=<Obsidian.exe> COMMANDER_ZIP=<package zip> OBSIDIAN_WALK=<scratch folder> node tools/walk_tab.mjs
+//   (or COMMANDER_FETCH=1 instead of COMMANDER_ZIP: Install Package downloads the newest release from GitHub)
 //
 // Everything lives in the scratch folder: data, game side, webview profile. The game folder points
 // nowhere, so nothing touches the game. Steps: the tab before the package, Join LAN War, the package
@@ -15,8 +16,10 @@ import path from "node:path";
 const SP = process.env.OBSIDIAN_WALK;
 const EXE = process.env.OBSIDIAN_EXE;
 const ZIP = process.env.COMMANDER_ZIP;
-if (!SP || !EXE || !ZIP) {
-  console.error("Set OBSIDIAN_WALK, OBSIDIAN_EXE and COMMANDER_ZIP.");
+// COMMANDER_FETCH=1: Install Package downloads the newest release from GitHub, as a player's does.
+const FETCH = process.env.COMMANDER_FETCH === "1";
+if (!SP || !EXE || (!ZIP && !FETCH)) {
+  console.error("Set OBSIDIAN_WALK, OBSIDIAN_EXE, and COMMANDER_ZIP or COMMANDER_FETCH=1.");
   process.exit(2);
 }
 const DATA = path.join(SP, "data"), APPDATA = path.join(SP, "appdata"), WEBVIEW = path.join(SP, "webview"), SHOTS = path.join(SP, "shots");
@@ -132,12 +135,22 @@ async function main() {
       await until(`document.querySelector('.cmd-join-dialog') == null`, "the dialog closing", 5000);
     });
     let server = null;
-    await step("package installs and the war screens load in the frame", async () => {
-      const v = await invoke("commander_install", { path: ZIP });
-      if (!v.installed) throw new Error("not installed");
-      await click(".tabs [role=tab][aria-label=Home]");
-      await sleep(400);
-      await click(".tabs [role=tab][aria-label=Commander]");
+    await step(FETCH ? "Install Package downloads the release from GitHub, and the war screens load" : "package installs and the war screens load in the frame", async () => {
+      if (FETCH) {
+        await click(".cmd-intro .btn.play", "Install Package");
+        await sleep(600);
+        await shot("04a-downloading");
+        await until(`document.querySelector('iframe.cmd-frame') != null`, "the download and install", 120000);
+        const v = await invoke("commander_state");
+        if (!v.installed) throw new Error("not installed");
+        console.log(`  installed ${v.installed.version} from GitHub`);
+      } else {
+        const v = await invoke("commander_install", { path: ZIP });
+        if (!v.installed) throw new Error("not installed");
+        await click(".tabs [role=tab][aria-label=Home]");
+        await sleep(400);
+        await click(".tabs [role=tab][aria-label=Commander]");
+      }
       await until(`document.querySelector('iframe.cmd-frame')?.src`, "the frame", 25000);
       server = await invoke("commander_state").then((s) => s.server);
       if (!server) throw new Error("no server");
