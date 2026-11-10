@@ -1,5 +1,5 @@
 // Shared pieces: the tooltip layer, dialogs, number fields, switches, segmented choices, notices.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties, type KeyboardEvent as RKey } from "react";
 import { createPortal } from "react-dom";
 import { t } from "../strings";
 import { IClose } from "./Icons";
@@ -62,17 +62,21 @@ export function TipLayer() {
 }
 
 /* A dialog over the page. Escape and the backdrop close it. */
-export function Modal({ title, onClose, children, foot, className = "" }: { title: ReactNode; onClose: () => void; children: ReactNode; foot?: ReactNode; className?: string }) {
+/* `keep`: a click beside the dialog doesn't close it (a form with unsaved changes). Focus goes to the
+   first field once, when the dialog opens; the page behind re-renders every second and must not move it. */
+export function Modal({ title, onClose, children, foot, className = "", keep }: { title: ReactNode; onClose: () => void; children: ReactNode; foot?: ReactNode; className?: string; keep?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); close.current(); } };
     window.addEventListener("keydown", k);
-    const first = box.current?.querySelector<HTMLElement>("input, select, textarea, button.btn:not(:disabled)");
+    const first = box.current?.querySelector<HTMLElement>("[data-autofocus], input, select, textarea, button.btn:not(:disabled)");
     (first ?? box.current)?.focus();
     return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
+  }, []);
   return createPortal(
-    <div className="modal-back" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-back" onPointerDown={(e) => { if (e.target === e.currentTarget && !keep) onClose(); }}>
       <div ref={box} className={`modal ${className}`} role="dialog" aria-modal="true" tabIndex={-1}>
         <div className="modal-head">
           <h2 className="cap">{title}</h2>
@@ -86,15 +90,75 @@ export function Modal({ title, onClose, children, foot, className = "" }: { titl
   );
 }
 
+/* The confirming button is Obsidian's: gold for a go-ahead, red for something that can't be taken back.
+   Cancel takes the focus, so Enter right after opening never confirms by accident. */
 export function Confirm({ title, text, okLabel, danger, onOk, onClose, children }: { title: string; text: string; okLabel: string; danger?: boolean; onOk: () => void; onClose: () => void; children?: ReactNode }) {
   return (
     <Modal title={title} onClose={onClose} className="confirm" foot={<>
-      <button className="btn" onClick={onClose}>{t("cancel")}</button>
-      <button className={`btn ${danger ? "danger" : "gold"}`} onClick={() => { onOk(); onClose(); }}>{okLabel}</button>
+      <button className="btn" data-autofocus onClick={onClose}>{t("cancel")}</button>
+      <button className={`btn ${danger ? "danger" : "play"}`} onClick={() => { onOk(); onClose(); }}>{okLabel}</button>
     </>}>
       <p className="lead">{text}</p>
       {children}
     </Modal>
+  );
+}
+
+/* A button's menu: items run and close it; Escape, a click elsewhere, a scroll or leaving the window close it.
+   It sits on the body, so a folded corner's mask can't cut it off. */
+export type MenuItem = { label: string; icon?: ReactNode; danger?: boolean; disabled?: boolean; tip?: string; run: () => void };
+export function MenuButton({ label, icon, items, className = "btn icon" }: { label: string; icon: ReactNode; items: MenuItem[]; className?: string }) {
+  const btn = useRef<HTMLButtonElement>(null);
+  const [at, setAt] = useState<{ right: number; top: number } | null>(null);
+  useEffect(() => {
+    if (!at) return;
+    const away = (e: PointerEvent) => {
+      const el = e.target as Element;
+      if (!el.closest?.(".menu") && !btn.current?.contains(el)) setAt(null);
+    };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { setAt(null); btn.current?.focus(); } };
+    const gone = () => setAt(null);
+    document.addEventListener("pointerdown", away, true);
+    window.addEventListener("keydown", key);
+    window.addEventListener("blur", gone);
+    window.addEventListener("resize", gone);
+    document.addEventListener("scroll", gone, true);
+    (document.querySelector(".menu button:not(:disabled)") as HTMLElement | null)?.focus();
+    return () => {
+      document.removeEventListener("pointerdown", away, true);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("blur", gone);
+      window.removeEventListener("resize", gone);
+      document.removeEventListener("scroll", gone, true);
+    };
+  }, [at]);
+  const toggle = () => {
+    if (at) { setAt(null); return; }
+    const r = btn.current!.getBoundingClientRect();
+    setAt({ right: Math.max(6, window.innerWidth - r.right), top: r.bottom + 4 });
+  };
+  const move = (e: RKey<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const all = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+    const i = all.indexOf(document.activeElement as HTMLButtonElement);
+    all[(i + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length]?.focus();
+  };
+  return (
+    <>
+      <button ref={btn} className={`${className}${at ? " open" : ""}`} aria-label={label} aria-haspopup="menu" aria-expanded={!!at} data-tip={at ? undefined : label} onClick={toggle}>{icon}</button>
+      {at && createPortal(
+        <div className="menu" role="menu" style={{ right: at.right, top: at.top }} onKeyDown={move}>
+          {items.map((it) => (
+            <button key={it.label} role="menuitem" className={it.danger ? "danger" : undefined} disabled={it.disabled} data-tip={it.tip}
+              onClick={() => { setAt(null); it.run(); }}>
+              {it.icon}<span>{it.label}</span>
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 

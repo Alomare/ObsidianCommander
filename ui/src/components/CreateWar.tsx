@@ -51,7 +51,7 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
                 <span className="mc-text"><b className="cap">{t("modelVanilla")}</b><small>{t("modelVanillaText")}</small></span>
               </button>
               <button type="button" className="model-card" disabled aria-disabled="true">
-                <span className="mc-soon cap">{t("milestone2")}</span>
+                <span className="mc-soon cap">{t("comingLater")}</span>
                 <span className="mc-text"><b className="cap">{t("modelEvolved")}</b><small>{t("modelEvolvedText")}</small></span>
               </button>
             </div>
@@ -74,14 +74,14 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
             </div>
           </div>
 
-          <button type="button" className={`fold${advanced ? " open" : ""}`} aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>
-            <IChevron /> <span className="cap">{t("advanced")}</span> <small className="muted">{t("advancedLead")}</small>
+          <button type="button" className={`fold${advanced ? " open" : ""}`} aria-expanded={advanced} onClick={() => setAdvanced(!advanced)} data-tip={t("advancedLead")}>
+            <IChevron /> <span className="cap">{t("advanced")}</span>
           </button>
           {advanced && <SettingsForm value={settings} onChange={setSettings} />}
         </section>
         <footer className="create-foot">
           <button type="button" className="btn" onClick={onCancel}>{t("cancel")}</button>
-          <button type="submit" className="btn go" disabled={busy}><IPlus />{busy ? t("creating") : t("create")}</button>
+          <button type="submit" className="btn play" disabled={busy}><IPlus />{busy ? t("creating") : t("create")}</button>
         </footer>
       </form>
     </div>

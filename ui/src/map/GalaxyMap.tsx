@@ -43,8 +43,9 @@ export const FACTION_ACCENT: Record<Faction, string> = {
 /** The Helldiver amber of the game's progress bars (bar_color is [r, g, b], without alpha). */
 export const HELLDIVER_ACCENT = "rgb(255, 170, 20)";
 
-const PAD = 96;
-const FULL = { x: -OUTER_R - PAD, y: -OUTER_R - PAD, w: (OUTER_R + PAD) * 2, h: (OUTER_R + PAD) * 2 };
+// Room for the home world names: they sit beside and under the rings, never above them.
+const PAD_X = 100, PAD_TOP = 28, PAD_BOTTOM = 92;
+const FULL = { x: -OUTER_R - PAD_X, y: -OUTER_R - PAD_TOP, w: (OUTER_R + PAD_X) * 2, h: OUTER_R * 2 + PAD_TOP + PAD_BOTTOM };
 
 interface Props {
   war: War;
@@ -68,12 +69,31 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
   const svg = useRef<SVGSVGElement>(null);
   const [view, setView] = useState(FULL);
   const [hover, setHover] = useState<Hover>(null);
+  const [size, setSize] = useState({ w: 800, h: 600 });
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean; id: number } | null>(null);
   const events = useMemo(() => eventsByRegion(war), [war]);
   const zoomed = view.w < FULL.w - 1;
 
   const selId = selection?.kind === "region" ? `${FACTION_OF[selection.enemy]}:${selection.region}` : selection?.kind === "superearth" ? "superearth" : null;
   const selFront = selection && selection.kind !== "superearth" ? FACTION_OF[selection.enemy] : null;
+
+  // The map's size on screen: text keeps a readable size however small the map is drawn.
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth || 800, h: el.clientHeight || 600 }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const ppu = Math.max(0.05, Math.min(size.w / view.w, size.h / view.h));
+  /** A font size in map units: `base` at full size, never under `minPx` on screen, never over `max`. */
+  const fs = (base: number, minPx: number, max: number) => Math.min(max, Math.max(base, minPx / ppu));
+  const nameF = fs(24, 12.5, 46), subF = fs(16, 10.5, 34), numF = fs(19, 10.5, 34), frontF = fs(23, 13, 40), seF = fs(16, 10.5, 30);
+  const markK = Math.min(3.2, Math.max(1.5, 10.5 / (12 * ppu)));
+  // Home world labels: top fronts write outward from the ring, the bottom front inward, so both lines
+  // stack the same way at any font size.
+  const rSubTop = OUTER_R + 8, rNameTop = rSubTop + subF * 1.17;
+  const rNameBottom = OUTER_R + 8 + nameF * 0.72, rSubBottom = rNameBottom + subF * 1.17;
 
   // Wheel zoom about the pointer, from the whole map down to a third of it.
   useEffect(() => {
@@ -89,7 +109,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
         const ox = (r.width - v.w * s) / 2, oy = (r.height - v.h * s) / 2;
         const px = v.x + (e.clientX - r.left - ox) / s, py = v.y + (e.clientY - r.top - oy) / s;
         const ratio = w / v.w;
-        return clampView({ x: px - (px - v.x) * ratio, y: py - (py - v.y) * ratio, w, h: w });
+        return clampView({ x: px - (px - v.x) * ratio, y: py - (py - v.y) * ratio, w, h: (w * FULL.h) / FULL.w });
       });
     };
     el.addEventListener("wheel", wheel, { passive: false });
@@ -207,11 +227,11 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
           {FACTIONS.map((f) => {
             const top = f !== "illuminates";
             const [a, b] = FRONT_SPAN[f];
-            const r = top ? OUTER_R + 18 : OUTER_R + 42;
-            const r2 = top ? OUTER_R + 48 : OUTER_R + 68;
+            const rName = top ? rNameTop : rNameBottom;
+            const rSub = top ? rSubTop : rSubBottom;
             return [
-              <path key={`${f}-l1`} id={`hw-${f}`} d={top ? arcPath(r, b + 2, a - 2) : arcPath(r, a - 2, b + 2)} />,
-              <path key={`${f}-l2`} id={`hw2-${f}`} d={top ? arcPath(r2, b + 2, a - 2) : arcPath(r2, a - 2, b + 2)} />,
+              <path key={`${f}-n`} id={`hwn-${f}`} d={top ? arcPath(rName, b + 2, a - 2) : arcPath(rName, a - 2, b + 2)} />,
+              <path key={`${f}-s`} id={`hws-${f}`} d={top ? arcPath(rSub, b + 2, a - 2) : arcPath(rSub, a - 2, b + 2)} />,
             ];
           })}
         </defs>
@@ -248,7 +268,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
         <g className="region-nums" aria-hidden>
           {REGIONS.filter((r) => r.index <= 10).map((r) => {
             const st = regionState(war, FACTION_OF.indexOf(r.faction), r.index);
-            return <text key={r.id} x={r.center[0]} y={r.center[1]} className={st}>{r.index}</text>;
+            return <text key={r.id} x={r.center[0]} y={r.center[1]} className={st} style={{ fontSize: st === "front" ? frontF : numF }}>{r.index}</text>;
           })}
         </g>
 
@@ -258,7 +278,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
           <circle r={SUPER_EARTH_R} fill="url(#se-core)" className="se-core" />
           <path className="se-lines" d={`M${-SUPER_EARTH_R * 0.92} -12 Q0 ${-SUPER_EARTH_R * 0.25} ${SUPER_EARTH_R * 0.92} -12 M${-SUPER_EARTH_R * 0.78} 26 Q0 ${SUPER_EARTH_R * 0.62} ${SUPER_EARTH_R * 0.78} 26`} />
           <circle r={SUPER_EARTH_R + 4} className="se-ring" />
-          <text y={SUPER_EARTH_R + 22} className="se-label">{regionName(null, 0, names).toUpperCase()}</text>
+          <text y={SUPER_EARTH_R + 8 + seF} className="se-label" style={{ fontSize: seF }}>{regionName(null, 0, names).toUpperCase()}</text>
         </g>
 
         {/* Home world names and front state at the outer ring. */}
@@ -267,11 +287,10 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
             const enemy = FACTION_OF.indexOf(f);
             const front = war.fronts.find((x) => x.enemy === enemy);
             const status = !front || front.status === "hidden" ? t("hidden") : front.status === "defeated" ? t("status_defeated") : `${enemyName(enemy)} · ${t("regionOf", { n: regionOf(front) })}`;
-            const top = f !== "illuminates";
             return (
               <g key={f} className={`hw ${f}${front?.status === "hidden" ? " dim" : ""}`}>
-                <text className="hw-name"><textPath href={`#${top ? "hw2" : "hw"}-${f}`} startOffset="50%">{regionName(enemy, 11, names).toUpperCase()}</textPath></text>
-                <text className="hw-sub" style={{ fill: front?.status === "active" ? FACTION_ACCENT[f] : undefined }}><textPath href={`#${top ? "hw" : "hw2"}-${f}`} startOffset="50%">{status.toUpperCase()}</textPath></text>
+                <text className="hw-name" style={{ fontSize: nameF }}><textPath href={`#hwn-${f}`} startOffset="50%">{regionName(enemy, 11, names).toUpperCase()}</textPath></text>
+                <text className="hw-sub" style={{ fontSize: subF, fill: front?.status === "active" ? FACTION_ACCENT[f] : undefined }}><textPath href={`#hws-${f}`} startOffset="50%">{status.toUpperCase()}</textPath></text>
               </g>
             );
           })}
@@ -285,7 +304,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
             const left = ev.end_time - nowUnix;
             const attack = ev.region >= 11;
             return (
-              <g key={ev.event_id} className={`marker ${attack ? "attack" : "defend"}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(1.5)`} data-region={id} onClick={() => clickRegion(id)}>
+              <g key={ev.event_id} className={`marker ${attack ? "attack" : "defend"}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${markK.toFixed(2)})`} data-region={id} onClick={() => clickRegion(id)}>
                 <circle r="22" className="marker-ping" />
                 {attack
                   ? <g className="marker-icon"><circle r="13" /><path d="M0 -20V-6M0 6V20M-20 0H-6M6 0H20" /></g>

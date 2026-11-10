@@ -7,6 +7,23 @@ import { FACTION_ACCENT } from "../map/GalaxyMap";
 import { Seg } from "./ui";
 
 type Range = "day" | "week" | "all";
+
+/** Round times for the x axis: midnights over a long span, whole hours over a short one, at most `max`. */
+function axisTicks(t0: number, t1: number, max: number): { tm: number; label: string }[] {
+  const span = t1 - t0;
+  const days = span > 36 * 3600;
+  const steps = days ? [1, 2, 7, 14, 30].map((d) => d * 86400) : [1, 2, 3, 6, 12].map((h) => h * 3600);
+  const step = steps.find((s) => span / s <= max) ?? steps[steps.length - 1];
+  const start = (() => {
+    const d = new Date(t0 * 1000);
+    if (days) { d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); } else { d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); }
+    return d.getTime() / 1000;
+  })();
+  const out: { tm: number; label: string }[] = [];
+  for (let tm = start; tm <= t1 && out.length < max + 1; tm += step) out.push({ tm, label: days ? dateTime(tm).replace(/,.*$/, "") : timeOfDay(tm) });
+  if (out.length === 0) out.push({ tm: t0, label: timeOfDay(t0) });
+  return out;
+}
 const SPAN: Record<Range, number> = { day: 86400, week: 7 * 86400, all: Infinity };
 
 export function HistoryChart({ war, history, nowUnix }: { war: War; history: Snapshot[]; nowUnix: number }) {
@@ -31,7 +48,7 @@ export function HistoryChart({ war, history, nowUnix }: { war: War; history: Sna
     return all.filter((s) => s.time >= from);
   }, [history, war, nowUnix, range]);
 
-  const H = 200, L = 30, R = 8, T = 10, B = 22;
+  const H = 176, L = 30, R = 8, T = 10, B = 22;
   const iw = Math.max(10, w - L - R), ih = H - T - B;
   const t0 = points[0]?.time ?? nowUnix - 3600;
   const t1 = Math.max(t0 + 60, points[points.length - 1]?.time ?? nowUnix);
@@ -67,12 +84,12 @@ export function HistoryChart({ war, history, nowUnix }: { war: War; history: Sna
   return (
     <div className="history">
       <div className="history-head">
-        <p className="muted small">{t("historyLead")}</p>
+        <h3 className="cap section-title" data-tip={t("historyLead")}>{t("historyTitle")}</h3>
         <Seg small value={range} onChange={setRange} options={[{ v: "day", label: t("range_day") }, { v: "week", label: t("range_week") }, { v: "all", label: t("range_all") }]} />
       </div>
       <div ref={box} className="chart-box">
         {points.length < 2 ? <p className="muted empty">{t("historyEmpty")}</p> : (
-          <svg width={w} height={H} onPointerMove={onMove} onPointerLeave={() => setHover(null)} role="img" aria-label={t("history")}>
+          <svg width={w} height={H} onPointerMove={onMove} onPointerLeave={() => setHover(null)} role="img" aria-label={t("historyTitle")}>
             <defs>
               {fronts.map((f) => (
                 <linearGradient key={f.enemy} id={`hg-${f.enemy}`} x1="0" x2="0" y1="0" y2="1">
@@ -87,10 +104,9 @@ export function HistoryChart({ war, history, nowUnix }: { war: War; history: Sna
                 {i % 5 === 0 && <text x={L - 5} y={y(i / 10) + 3.5} className="haxis" textAnchor="end">{i * 10}%</text>}
               </g>
             ))}
-            {Array.from({ length: ticks + 1 }, (_, i) => {
-              const tm = t0 + ((t1 - t0) * i) / ticks;
-              return <text key={i} x={x(tm)} y={H - 6} className="haxis" textAnchor={i === 0 ? "start" : i === ticks ? "end" : "middle"}>{t1 - t0 > 86400 ? dateTime(tm).replace(/,.*$/, "") : timeOfDay(tm)}</text>;
-            })}
+            {axisTicks(t0, t1, ticks).map(({ tm, label }, i, all) => (
+              <text key={tm} x={x(tm)} y={H - 6} className="haxis" textAnchor={all.length > 1 && i === 0 && x(tm) < L + 20 ? "start" : x(tm) > L + iw - 20 ? "end" : "middle"}>{label}</text>
+            ))}
             {fronts.map((f) => {
               const d = line(f.enemy);
               if (!d) return null;

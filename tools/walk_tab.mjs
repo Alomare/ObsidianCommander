@@ -7,8 +7,9 @@
 // Everything lives in the scratch folder: data, game side, webview profile. The game folder points
 // nowhere, so nothing touches the game. Steps: the tab before the package, Join LAN War, the package
 // installed (through the same command the Install button calls, since a native file dialog can't be
-// driven), the war screens in the frame, a war created and opened, the light theme. Fails on any
-// console error, which is where a refused frame shows.
+// driven), the war screens in the frame, a war created and opened, the light theme, the package menu,
+// Remove All Commander Data on the scratch data. Fails on any console error, which is where a refused
+// frame shows.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -177,6 +178,34 @@ async function main() {
       await click(".tabs [role=tab][aria-label=Commander]");
       await sleep(2500);
       await shot("07-shell-light");
+    });
+    await step("the package menu, and Remove Package asks first", async () => {
+      await click(".cmd-pkg");
+      await until(`document.querySelector('.ctx') != null`, "the menu");
+      await shot("08-package-menu");
+      await click(".ctx button", "Remove Package");
+      await until(`document.querySelector('.modal.confirm') != null`, "the question");
+      await shot("09-remove-package-asks");
+      await click(".modal.confirm .btn", "Cancel");
+      await until(`document.querySelector('.modal.confirm') == null`, "the question closing", 5000);
+      if (!(await invoke("commander_state")).installed) throw new Error("Cancel removed the package");
+    });
+    await step("Remove All Commander Data lists what goes, then leaves nothing", async () => {
+      const before = await invoke("commander_footprint");
+      if (!before.package || before.hosted < 1) throw new Error(`footprint ${q(before)}`);
+      await click(".cmd-pkg");
+      await click(".ctx button", "Remove All Commander Data");
+      await until(`document.querySelector('.cmd-wipe li') != null`, "the list");
+      await shot("10-wipe-dialog");
+      await click(".modal.confirm .btn.danger");
+      await until(`document.querySelector('.cmd-intro') != null`, "the intro again", 20000);
+      await sleep(800);
+      await shot("11-after-wipe");
+      const after = await invoke("commander_footprint");
+      if (after.package != null || after.hosted || after.joined || after.bytes) throw new Error(`left ${q(after)}`);
+      if (fs.existsSync(path.join(DATA, "commander"))) throw new Error("the commander folder is still there");
+      if ((await invoke("commander_state")).server) throw new Error("the server still runs");
+      if (await js("document.querySelector('.cmd-left') != null")) throw new Error("the intro still reports Commander data");
     });
     await step("no console errors (a refused frame shows here)", async () => {
       const real = errors.filter((e) => !/favicon/i.test(e));
