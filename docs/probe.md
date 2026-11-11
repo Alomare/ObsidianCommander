@@ -107,6 +107,7 @@ Two passes of `probe/run.py play --hd2` and `--event`, runs `probe/runs/20261109
 
 | Hypothesis | Result | Evidence |
 |---|---|---|
+| A mod sends a GET (2026-11-11, `war_run.py --evolved`) | **X.** `Http.create_request("GET", url)` reaches the server as POST with no body: a listener saw `POST /probe-get body=0`. The game itself only ever sends POST. The Evolved War Engine asks with POST since 0.2.2, and the relay takes it | `cmdprobe.log` HTTPM lines, the run output |
 | A mod sends HTTP calls to a custom route | **V.** `Http.create_request("POST", <relay>/commander/report)` with a JSON body; the callback gets `(request, 200, body)` and `Sjson.decode_sjson` reads the answer. Twice, no error | `cmdprobe.log` HTTP lines, `requests.jsonl` |
 | Custom planets survive game rerolls | **V.** Three planets renamed to invented keys (`cmdwar_planet_1..3`) stayed in place through two region changes: the post-hook on `generate_planets` put them back each time | `PLANETS` lines |
 | Custom planet names show in the stock game UI | **V.** The ship banner read "ORBITANDO KEPLER PRIME" and the loading screen "KEPLER PRIME", from `obsidian.game_text` | `stuck.png`, `loadout.png` |

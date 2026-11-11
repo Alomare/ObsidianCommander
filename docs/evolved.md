@@ -33,7 +33,7 @@ The stock uploads the game sends (`complete_planets` and the event missions) mov
 
 ## API
 
-The mod reaches the war through the Obsidian relay: `http://127.0.0.1:<relay>/<token>/evolved/<call>` goes to `/w/<id>/evolved/<call>`, with the Steam ID in `X-Commander-Player` when it is a hex string.
+The mod reaches the war through the Obsidian relay: `http://127.0.0.1:<relay>/<token>/evolved/<call>` goes to `/w/<id>/evolved/<call>`, with the Steam ID in `X-Commander-Player` when it is a hex string. The game's `Http` sends every request as POST, whatever method it is given, so the mod asks for `state` with POST and the relay asks the war server with GET (Obsidian built on 2026-11-11 or later).
 
 | Call | What it does |
 |---|---|
