@@ -2,9 +2,8 @@
 import { memo } from "react";
 import type { FrontBrief } from "../types";
 import { FACTION_OF } from "../util";
-import { OUTER_R, REGIONS, SUPER_EARTH_R } from "./geometry";
+import { OUTER_R, REGIONS, SUPER_EARTH_R, gameColor } from "./geometry";
 import { PLANETS, RIM, SECTORS, START_OWNERS, ownerColor, sectorHolder } from "./galaxy";
-import { sideColor } from "../palette";
 
 function stateOf(fronts: FrontBrief[] | undefined, enemy: number, index: number) {
   const f = fronts?.find((x) => x.enemy === enemy);
@@ -22,11 +21,11 @@ export const MiniMap = memo(function MiniMap({ fronts }: { fronts?: FrontBrief[]
       <circle r={OUTER_R + 6} className="mm-back" />
       {REGIONS.map((r) => {
         const st = stateOf(fronts, FACTION_OF.indexOf(r.faction), r.index);
-        const fill = st === "liberated" ? sideColor("superearth", 0.45)
-          : st === "front" ? sideColor(r.faction, 0.75)
-          : st === "home" ? sideColor(r.faction, 0.9)
-          : st === "hidden" ? "rgba(120, 140, 170, 0.25)"
-          : sideColor(r.faction, 0.38);
+        const fill = st === "liberated" ? gameColor("helldivers", "fill_color", 0.75)
+          : st === "front" ? gameColor(r.faction, "active_fill_color", 1)
+          : st === "home" ? gameColor(r.faction, "hq_fill_color", 1.3)
+          : st === "hidden" ? gameColor("hidden", "fill_color", 2.5)
+          : gameColor(r.faction, "fill_color", 1.6);
         return <path key={r.id} d={r.path} style={{ fill }} className="mm-region" />;
       })}
       <circle r={SUPER_EARTH_R} className="mm-se" />

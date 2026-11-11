@@ -3,8 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProper
 import type { War, WarEvent } from "../types";
 import { t } from "../strings";
 import { clock, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
-import { FACTIONS, FRONT_MID, FRONT_SPAN, OUTER_R, REGIONS, SUPER_EARTH_R, arcPath, polar, ringRadius, wedgePath, type Faction, type RegionShape } from "./geometry";
-import { SE_COLOR, sideColor } from "../palette";
+import { FACTIONS, FRONT_MID, FRONT_SPAN, OUTER_R, REGIONS, SUPER_EARTH_R, arcPath, gameColor, polar, ringRadius, wedgePath, type Faction, type RegionShape } from "./geometry";
 
 export type Selection =
   | { kind: "front"; enemy: number }
@@ -25,24 +24,24 @@ export function regionState(war: War, enemy: number, index: number): RegionState
   return "enemy";
 }
 
-/** Colours per faction and state, from the war palette. */
-export function paint(f: Faction, s: RegionState): { fill: string; stroke: string } {
+/** Colours per faction and state, from the game table. Alphas lifted, as the game draws additively over a bright backdrop. */
+function paint(f: Faction, s: RegionState): { fill: string; stroke: string } {
   switch (s) {
-    case "liberated": return { fill: sideColor("superearth", 0.3), stroke: sideColor("superearth", 0.85) };
-    case "front": return { fill: sideColor(f, 0.5), stroke: sideColor(f, 1) };
-    case "home": return { fill: sideColor(f, 0.62), stroke: sideColor(f, 1) };
-    case "hidden": return { fill: "rgba(120, 140, 170, 0.16)", stroke: "rgba(160, 180, 210, 0.45)" };
-    default: return { fill: sideColor(f, 0.22), stroke: sideColor(f, 0.55) };
+    case "liberated": return { fill: gameColor("helldivers", "fill_color", 0.5), stroke: gameColor("helldivers", "border_color", 1) };
+    case "front": return { fill: gameColor(f, "active_fill_color", 0.62), stroke: gameColor(f, "active_border_color", 1.25) };
+    case "home": return { fill: gameColor(f, "hq_fill_color", 0.95), stroke: gameColor(f, "hq_border_color", 1.4) };
+    case "hidden": return { fill: gameColor("hidden", "fill_color", 2.4), stroke: gameColor("hidden", "border_color", 1.6) };
+    default: return { fill: gameColor(f, "fill_color", 1.15), stroke: gameColor(f, "border_color", 1.7) };
   }
 }
 
 export const FACTION_ACCENT: Record<Faction, string> = {
-  bugs: sideColor("bugs"),
-  cyborgs: sideColor("cyborgs"),
-  illuminates: sideColor("illuminates"),
+  bugs: gameColor("bugs", "active_border_color", 4),
+  cyborgs: gameColor("cyborgs", "active_border_color", 4),
+  illuminates: gameColor("illuminates", "active_border_color", 4),
 };
-/** Super Earth blue: liberation and defense progress. */
-export const HELLDIVER_ACCENT = SE_COLOR;
+/** The Helldiver amber of the in-game progress bars (bar_color is [r, g, b], without alpha). */
+export const HELLDIVER_ACCENT = "rgb(255, 170, 20)";
 
 // Room for the home world names: they sit beside and under the rings, never above them.
 const PAD_X = 100, PAD_TOP = 28, PAD_BOTTOM = 92;
@@ -305,8 +304,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
             const left = ev.end_time - nowUnix;
             const attack = ev.region >= 11;
             return (
-              <g key={ev.event_id} className={`marker ${attack ? "attack" : "defend"}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${markK.toFixed(2)})`} data-region={id} onClick={() => clickRegion(id)}
-                style={{ "--fc": FACTION_ACCENT[FACTION_OF[ev.enemy]] } as CSSProperties}>
+              <g key={ev.event_id} className={`marker ${attack ? "attack" : "defend"}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${markK.toFixed(2)})`} data-region={id} onClick={() => clickRegion(id)}>
                 <circle r="22" className="marker-ping" />
                 {attack
                   ? <g className="marker-icon"><circle r="13" /><path d="M0 -20V-6M0 6V20M-20 0H-6M6 0H20" /></g>

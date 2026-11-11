@@ -180,7 +180,7 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
             <stop offset="100%" stopColor="rgba(120, 180, 255, 0)" />
           </radialGradient>
           <radialGradient id="evo-haze">
-            <stop offset="0%" stopColor="rgba(70, 160, 255, 0.08)" />
+            <stop offset="0%" stopColor="rgba(255, 170, 20, 0.07)" />
             <stop offset="70%" stopColor="rgba(80, 100, 160, 0.05)" />
             <stop offset="100%" stopColor="rgba(80, 100, 160, 0.02)" />
           </radialGradient>
