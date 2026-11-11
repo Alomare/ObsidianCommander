@@ -5,7 +5,7 @@ Custom Galactic Wars for HELLDIVERS (2015), hosted from the COMMANDER tab in Obs
 Two kinds of war, local or over LAN:
 
 - **Vanilla Wars** keep the campaign model built into the game, and the host sets the rules.
-- **Evolved Wars** (first version) play on the HELLDIVERS 2 galaxy: planets that change hands, supply lines, liberation and defense campaigns, operations of two or three missions, and Major Orders. Every player runs the [Evolved War Engine](https://github.com/Alomare/HD1-EvolvedWarEngine) mod, which replaces the galaxy map of the ship and reports the missions. See [docs/evolved.md](docs/evolved.md).
+- **Evolved Wars** (first version) play on the HELLDIVERS 2 galaxy: planets that change hands, supply lines, liberation and defense campaigns, operations of two or three missions, and Major Orders. Every player runs the [Evolved War Engine](https://github.com/Alomare/HD1-EvolvedWarEngine) mod, which replaces the galaxy map of the ship and reports the missions. Obsidian installs the mod and enables it in the active profile when an Evolved war is created or selected. See [docs/evolved.md](docs/evolved.md).
 
 ## Parts
 

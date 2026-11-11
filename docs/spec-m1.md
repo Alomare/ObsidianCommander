@@ -194,6 +194,7 @@ Messages with `window.postMessage`. The interface only acts on messages from the
 | `commander:play` | `war`, `name` | selects that war for play: creates a Sandbox save for the war on first use, selects that save, then starts the game |
 | `commander:select` | `war`, `name` | selects that war for play without starting the game |
 | `commander:official` | | goes back to the official war |
+| `commander:created` | `war`, `name`, `model` | a war was created; for `model: "evolved"`, Obsidian installs the newest Evolved War Engine release when missing and enables it in the active profile. Selecting an Evolved war does the same |
 | `commander:ready` | | the interface loaded; Obsidian answers with `obsidian:hello` |
 
 Region names: the loader writes them in the game language when the game first starts in war mode. Until then `names` is empty and the interface uses built-in labels.
