@@ -25,6 +25,8 @@ fn temp_dir(tag: &str) -> PathBuf {
 fn start(data: &Path, ui: &Path) -> Handle {
     let mut cfg = Config::new(data.to_path_buf(), 0, TOKEN.into(), ui.to_path_buf());
     cfg.lan_port = 0;
+    // Loopback, so Windows shows no firewall prompt for the test program.
+    cfg.lan_bind = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
     cfg.discovery_port = 0;
     cfg.tick_seconds = 0.0;
     commander::start(cfg).expect("server starts")
@@ -1017,5 +1019,64 @@ fn evolved_war_through_the_mod_routes() {
             .iter()
             .any(|c| c["kind"] == "defense")
     );
+    h.shutdown();
+}
+
+#[test]
+fn a_request_named_for_a_public_site_gets_nothing() {
+    let (data, ui) = (temp_dir("host"), temp_dir("host-ui"));
+    std::fs::write(ui.join("index.html"), "<!doctype html>").unwrap();
+    let h = start(&data, &ui);
+    let ask = |host: &str| {
+        let mut s = TcpStream::connect(("127.0.0.1", h.port)).expect("connect");
+        write!(
+            s,
+            "GET /api/info?token={TOKEN} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
+        let mut raw = String::new();
+        s.read_to_string(&mut raw).unwrap();
+        raw.split(' ').nth(1).unwrap().parse::<u16>().unwrap()
+    };
+    assert_eq!(ask("rebind.example.com"), 403);
+    assert_eq!(ask(&format!("127.0.0.1:{}", h.port)), 200);
+    assert_eq!(ask("localhost"), 200);
+    h.shutdown();
+}
+
+#[test]
+fn a_full_war_takes_no_new_players() {
+    let (data, ui) = (temp_dir("room"), temp_dir("room-ui"));
+    let h = start(&data, &ui);
+    let war = create_war(h.port, json!({}))["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    {
+        let mut wars = h.app.wars();
+        let slot = wars.get_mut(&war).unwrap();
+        let mut out = commander::rules::Out::default();
+        for i in 0..commander::rules::MAX_MEMBERS {
+            slot.war.touch_member(&format!("a{i}"), None, 0, &mut out);
+        }
+        assert!(slot.war.has_room("a0"), "a member stays welcome");
+        assert!(!slot.war.has_room("newcomer"));
+    }
+    let form = b"action=get_campaign_status";
+    let ask = |player: &str| {
+        http(
+            h.port,
+            "POST",
+            &format!("/w/{war}/1.0/"),
+            &[
+                ("Content-Type", "application/x-www-form-urlencoded"),
+                ("X-Commander-Player", player),
+            ],
+            form,
+        )
+        .status
+    };
+    assert_eq!(ask("a1"), 200);
+    assert_eq!(ask("newcomer"), 403);
     h.shutdown();
 }

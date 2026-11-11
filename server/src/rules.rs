@@ -9,6 +9,8 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
 pub const ENEMIES: usize = 3;
+/// The most players a war keeps.
+pub const MAX_MEMBERS: usize = 5000;
 pub const MAX_TICK_SECONDS: f64 = 60.0;
 pub const SUPER_EARTH_REGION: i64 = 0;
 pub const HOME_WORLD_REGION: i64 = 11;
@@ -1150,6 +1152,12 @@ impl War {
 
     // ---- members and indexes
 
+    /// Whether `player` is a member, or the war still takes new ones. Each member stays in the war
+    /// file, so a caller that invents player ids cannot grow it without end.
+    pub fn has_room(&self, player: &str) -> bool {
+        self.members.len() < MAX_MEMBERS || self.members.iter().any(|m| m.player == player)
+    }
+
     /// Records a request from a player. Saves are only asked for when something worth keeping moved.
     pub fn touch_member(&mut self, player: &str, name: Option<&str>, now: i64, out: &mut Out) {
         let name = name
@@ -1897,8 +1905,15 @@ mod tests {
             .collect();
         assert_eq!(started, [2.0, 3.0], "the feed counts as people do");
         let rows = w.status_rows();
-        assert_eq!(rows[0]["season"], game + 2, "the game keeps the game season");
-        assert_eq!(rows[0]["shown_season"], 3, "the loader shows the war season");
+        assert_eq!(
+            rows[0]["season"],
+            game + 2,
+            "the game keeps the game season"
+        );
+        assert_eq!(
+            rows[0]["shown_season"], 3,
+            "the loader shows the war season"
+        );
         // A war from before first_season counts back from the seasons it keeps.
         w.first_season = None;
         assert_eq!(w.shown_season(), 3);

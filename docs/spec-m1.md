@@ -45,6 +45,8 @@ Opening a war to LAN starts a second listener on `0.0.0.0:<lan port>` (default 1
 
 Everything else answers 404 on the LAN listener. The listener closes when no war is open to LAN.
 
+The LAN listener answers callers from loopback, the private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), link-local addresses and the ranges VPN tools hand out (100.64.0.0/10, 25.0.0.0/8); any other address gets 403. Both listeners answer 403 to a request whose `Host` header is a public site name (an address, a name without dots and a `.local` name pass). A war keeps at most 5000 players: a new player id past that gets 403.
+
 ### LAN discovery
 
 While a war is open to LAN, the server sends a UDP broadcast to `255.255.255.255:17493` every 3 seconds:

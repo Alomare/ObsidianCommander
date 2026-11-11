@@ -3,7 +3,7 @@
 use crate::http::{self, Via};
 use crate::{App, VERSION};
 use serde_json::json;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
@@ -22,13 +22,13 @@ pub struct LanListener {
     workers: Vec<JoinHandle<()>>,
 }
 
-fn bind(first: u16) -> Option<tiny_http::Server> {
+fn bind(at: IpAddr, first: u16) -> Option<tiny_http::Server> {
     if first == 0 {
-        return tiny_http::Server::http(("0.0.0.0", 0)).ok();
+        return tiny_http::Server::http((at, 0)).ok();
     }
     (0..PORT_TRIES)
         .filter_map(|i| first.checked_add(i))
-        .find_map(|p| tiny_http::Server::http(("0.0.0.0", p)).ok())
+        .find_map(|p| tiny_http::Server::http((at, p)).ok())
 }
 
 /// Opens or closes the LAN listener so it runs exactly while some war is open to LAN.
@@ -37,7 +37,8 @@ pub fn sync(app: &Arc<App>) -> Result<(), String> {
     let wanted = app.wars().values().any(|s| s.lan_open);
     let running = app.lan.lock().map(|l| l.is_some()).unwrap_or(false);
     if wanted && !running {
-        let server = bind(app.cfg.lan_port).ok_or("no free port for the LAN listener")?;
+        let server =
+            bind(app.cfg.lan_bind, app.cfg.lan_port).ok_or("no free port for the LAN listener")?;
         let port = server.server_addr().to_ip().map(|a| a.port()).unwrap_or(0);
         let server = Arc::new(server);
         let stop = Arc::new(AtomicBool::new(false));
@@ -48,7 +49,7 @@ pub fn sync(app: &Arc<App>) -> Result<(), String> {
             })
             .collect();
         app.log
-            .line(&format!("LAN listener open on 0.0.0.0:{port}"));
+            .line(&format!("LAN listener open on {}:{port}", app.cfg.lan_bind));
         *app.lan.lock().map_err(|_| "lock")? = Some(LanListener {
             port,
             server,

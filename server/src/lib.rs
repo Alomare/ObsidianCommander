@@ -14,6 +14,7 @@ pub mod store;
 use rules::{Dice, Out, SplitMix};
 use std::collections::BTreeMap;
 use std::io;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -42,6 +43,10 @@ pub struct Config {
     pub ui: PathBuf,
     /// First port tried for the LAN listener (0: the OS chooses).
     pub lan_port: u16,
+    /// The address the LAN listener binds. Tests bind loopback, so no firewall prompt appears.
+    pub lan_bind: IpAddr,
+    /// Whether the LAN listener answers addresses outside the private ranges.
+    pub lan_any_source: bool,
     /// Where discovery packets go (0: no discovery).
     pub discovery_port: u16,
     /// Seconds between ticks (0: no tick thread; tests tick by hand).
@@ -56,6 +61,8 @@ impl Config {
             token,
             ui,
             lan_port: DEFAULT_LAN_PORT,
+            lan_bind: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            lan_any_source: false,
             discovery_port: DISCOVERY_PORT,
             tick_seconds: 5.0,
         }

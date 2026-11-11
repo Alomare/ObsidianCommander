@@ -2,7 +2,7 @@ use commander::{Config, PROTOCOL, VERSION};
 use std::io::Read;
 use std::path::PathBuf;
 
-const USAGE: &str = "commander-server --data <dir> --port <port> --token <admin token> [--ui <dir>] [--lan-port <port>] [--keep-running]";
+const USAGE: &str = "commander-server --data <dir> --port <port> --token <admin token> [--ui <dir>] [--lan-port <port>] [--lan-any-source] [--keep-running]";
 
 fn main() {
     let mut data = None;
@@ -11,6 +11,7 @@ fn main() {
     let mut ui = None;
     let mut lan_port = None;
     let mut keep_running = false;
+    let mut lan_any_source = false;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -20,6 +21,7 @@ fn main() {
             "--ui" => ui = args.next().map(PathBuf::from),
             "--lan-port" => lan_port = args.next().and_then(|p| p.parse::<u16>().ok()),
             "--keep-running" => keep_running = true,
+            "--lan-any-source" => lan_any_source = true,
             "--version" => {
                 println!("commander-server {VERSION} protocol={PROTOCOL}");
                 return;
@@ -43,6 +45,7 @@ fn main() {
     if let Some(p) = lan_port {
         cfg.lan_port = p;
     }
+    cfg.lan_any_source = lan_any_source;
     let handle = match commander::start(cfg) {
         Ok(h) => h,
         Err(e) => fail(&format!("could not start: {e}")),
