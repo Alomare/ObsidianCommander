@@ -5,7 +5,7 @@
 //   (or COMMANDER_FETCH=1 instead of COMMANDER_ZIP: Install Package downloads the newest release from GitHub)
 //
 // Everything lives in the scratch folder: data, game side, webview profile. The game folder points
-// nowhere, so nothing touches the game. Steps: the tab before the package, Join LAN War, the package
+// nowhere, so nothing touches the game. Steps: the tab before the package, Join War, the package
 // installed (through the same command the Install button calls, since a native file dialog can't be
 // driven), the war screens in the frame, a war created and opened, the light theme, the package menu,
 // Remove All Commander Data on the scratch data. Fails on any console error, which is where a refused
@@ -126,8 +126,8 @@ async function main() {
       await until(`document.querySelector('.cmd-intro h1')?.textContent`, "the intro");
       await shot("01-intro");
     });
-    await step("Join LAN War lists nothing on an empty network", async () => {
-      await click(".cmd-intro .btn", "Join LAN War");
+    await step("Join War lists nothing on an empty network", async () => {
+      await click(".cmd-intro .btn", "Join War");
       await until(`document.querySelector('.cmd-join-dialog') != null`, "the dialog");
       await shot("02-join-scanning");
       await until(`document.querySelector('.cmd-found-empty')?.textContent.includes('No war found')`, "the end of the scan", 12000);
@@ -180,6 +180,9 @@ async function main() {
       await shot("07-shell-light");
     });
     await step("the package menu, and Remove Package asks first", async () => {
+      // The package button sits under the war list: a second click on the tab goes back to the list.
+      await click(".tabs [role=tab][aria-label=Commander]");
+      await until(`document.querySelector(".cmd-pkg") != null`, "the war list with the package button", 8000);
       await click(".cmd-pkg");
       await until(`document.querySelector('.ctx') != null`, "the menu");
       await shot("08-package-menu");
