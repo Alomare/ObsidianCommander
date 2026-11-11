@@ -11,7 +11,8 @@ export interface Api {
   action(id: string, body: GmAction): Promise<War>;
   feed(id: string, after?: number, limit?: number): Promise<FeedEntry[]>;
   history(id: string, from?: number): Promise<Snapshot[]>;
-  lan(id: string, open: boolean): Promise<{ open: boolean; port: number | null }>;
+  /** Opens or closes a war to the local network; `internet` also lets callers from outside reach it. */
+  lan(id: string, open: boolean, internet?: boolean): Promise<{ open: boolean; port: number | null; internet?: boolean }>;
   exportWar(id: string): Promise<Blob>;
   importWar(file: unknown): Promise<War>;
 }
@@ -96,7 +97,7 @@ const http: Api = {
     const q = from != null ? `?from=${from}` : "";
     return listOf(await call("GET", `api/wars/${enc(id)}/history${q}`), "snapshots", "history").map(normSnapshot);
   },
-  lan: (id, open) => call("POST", `api/wars/${enc(id)}/lan`, { open }),
+  lan: (id, open, internet) => call("POST", `api/wars/${enc(id)}/lan`, internet === undefined ? { open } : { open, internet }),
   exportWar: (id) => call("GET", `api/wars/${enc(id)}/export`, undefined, true),
   importWar: (file) => call("POST", "api/wars/import", file),
 };

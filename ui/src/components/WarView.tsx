@@ -12,7 +12,7 @@ import { CommandPanel } from "./CommandPanel";
 import { EvolvedBody } from "./EvolvedView";
 import { EvolvedSettingsDialog } from "./EvolvedSettings";
 import { FeedList, PlayersPanel, SettingsDialog, StatsPanel } from "./Panels";
-import { EnemyIcon, IBack, ICheck, IEdit, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, ILan, IList, IMore, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
+import { EnemyIcon, IBack, ICheck, IEdit, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, IGlobe, ILan, IList, IMore, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
 import { Confirm, MenuButton, Seg, Switch, notify } from "./ui";
 import { WarInfoDialog } from "./WarInfo";
 
@@ -43,7 +43,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const now = useNow(1000);
   const [selection, setSelection] = useState<Selection>(mockStart.sel);
   const [tab, setTab] = useState<Tab>(mockStart.tab);
-  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "lan" | SeasonAsk>(null);
+  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "lan" | "internet" | SeasonAsk>(null);
   const [result, setResult] = useState<"won" | "lost">("won");
 
   /** A Game Master action; true when the server took it. */
@@ -105,9 +105,9 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
       notify(e instanceof Error ? e.message : String(e), true);
     }
   };
-  const setLan = async (open: boolean) => {
+  const setLan = async (open: boolean, internet?: boolean) => {
     try {
-      const lan = await api.lan(war.id, open);
+      const lan = await api.lan(war.id, open, internet);
       accept({ ...war, lan });
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e), true);
@@ -162,6 +162,17 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
               <small>{war.lan.open && war.lan.port ? t("lanPort", { port: war.lan.port }) : t("lanClosed")}</small>
             </span>
             <Switch on={war.lan.open} onChange={toggleLan} label={t("lan")} />
+          </label>
+        )}
+        {!readOnly && war.lan.open && (
+          <label className={`lan-ctl${war.lan.internet ? " on" : ""}`} data-tip-title={t("internet")} data-tip={t("internetTip")}>
+            <IGlobe />
+            <span className="lan-text">
+              <b>{t("internetShort")}</b>
+              <small>{war.lan.internet ? t("internetOpen") : t("lanClosed")}</small>
+            </span>
+            {/* Opening always asks: the war then answers anyone who has the address. */}
+            <Switch on={!!war.lan.internet} onChange={(on) => (on ? setDialog("internet") : setLan(true, false))} label={t("internet")} />
           </label>
         )}
         {!readOnly && (
@@ -232,6 +243,10 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
       {dialog === "lan" && (
         <Confirm title={t("lan")} text={t("lanFirewall")} okLabel={t("lan")} onClose={() => setDialog(null)}
           onOk={() => { try { localStorage.setItem(FIREWALL_SEEN, "1"); } catch { /* storage blocked */ } setLan(true); }} />
+      )}
+      {dialog === "internet" && (
+        <Confirm title={t("internet")} text={t("internetText", { port: war.lan.port ?? 17494 })} okLabel={t("internet")} onClose={() => setDialog(null)}
+          onOk={() => setLan(true, true)} />
       )}
       {dialog === "end" && (
         <Confirm title={t("endSeason")} text={t("endSeasonText", { n: war.season })} okLabel={t("endSeason")} danger={result === "lost"} onOk={() => run({ action: "end_season", result })} onClose={() => setDialog(null)}>

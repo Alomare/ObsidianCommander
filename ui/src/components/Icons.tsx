@@ -31,6 +31,7 @@ export const IMore = (p: P) => <svg {...base(p)} fill="currentColor" stroke="non
 export const IWarn = (p: P) => <svg {...base(p)}><path d="M12 3L22 20H2z" strokeLinejoin="miter" /><path d="M12 9.5v5M12 16.5v1.5" /></svg>;
 export const IShield = (p: P) => <svg {...base(p)}><path d="M12 3l8 3v6c0 4.5-3.4 7.8-8 9-4.6-1.2-8-4.5-8-9V6z" /></svg>;
 export const ITarget = (p: P) => <svg {...base(p)}><circle cx="12" cy="12" r="7" /><path d="M12 2v5M12 17v5M2 12h5M17 12h5" /></svg>;
+export const IGlobe = (p: P) => <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" /></svg>;
 export const ILan = (p: P) => <svg {...base(p)}><rect x="9" y="3" width="6" height="5" /><rect x="3" y="16" width="6" height="5" /><rect x="15" y="16" width="6" height="5" /><path d="M12 8v4M6 16v-4h12v4" /></svg>;
 export const IUsers = (p: P) => <svg {...base(p)}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.7 3.3-5.5 6.5-5.5s5.7 1.8 6.5 5.5" /><path d="M15.5 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.8.8 3 2.5 3.5 5.2" /></svg>;
 export const IList = (p: P) => <svg {...base(p)}><path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1" /></svg>;

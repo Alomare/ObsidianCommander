@@ -28,6 +28,8 @@ pub struct WarSlot {
     pub history: Vec<Snapshot>,
     pub dir: PathBuf,
     pub lan_open: bool,
+    /// Whether callers from outside the local network reach the war too. Only with `lan_open`.
+    pub internet_open: bool,
 }
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -60,6 +62,15 @@ fn read_lines<T: for<'de> Deserialize<'de>>(path: &Path) -> Vec<T> {
 }
 
 impl WarSlot {
+    /// Whether a request that came `via` this way gets the war.
+    pub fn reachable(&self, via: crate::http::Via) -> bool {
+        match via {
+            crate::http::Via::Loopback => true,
+            crate::http::Via::Lan => self.lan_open,
+            crate::http::Via::Internet => self.lan_open && self.internet_open,
+        }
+    }
+
     pub fn new(war: War, wars_dir: &Path) -> Self {
         let dir = wars_dir.join(&war.id);
         WarSlot {
@@ -68,6 +79,7 @@ impl WarSlot {
             history: vec![],
             dir,
             lan_open: false,
+            internet_open: false,
         }
     }
 
@@ -80,6 +92,7 @@ impl WarSlot {
             history: read_lines(&dir.join("history.jsonl")),
             dir: dir.to_path_buf(),
             lan_open: false,
+            internet_open: false,
         })
     }
 

@@ -177,6 +177,11 @@ const en = {
   lanTip: "Players on this network see the war in Obsidian and can join it.",
   lanPort: "Port {port}",
   lanClosed: "Closed",
+  internet: "Open to Internet",
+  internetShort: "Internet",
+  internetOpen: "Open",
+  internetTip: "Players outside this network can join with the address of this PC. Needs port forwarding on the router.",
+  internetText: "The war will answer anyone who has the address of this PC: the game requests of players and the read-only war screens. Forward TCP port {port} on the router to this PC, then give players the public address with that port, such as 203.0.113.7:{port}. In Obsidian they pick Join War and type it under Join by Address. The war server takes the player name each game states, so share the address with trusted players only.",
   lanFirewall: "Players on this network will see this war in Obsidian and can join it. Windows may ask to let the war server through the firewall: allow it on private networks.",
 
   events: "Events",

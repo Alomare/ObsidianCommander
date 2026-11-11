@@ -495,7 +495,10 @@ fn admin_api_token_settings_actions_feed() {
     assert_eq!(war["state"], "running");
     assert_eq!(war["fronts"][0]["region"], 2);
     assert_eq!(war["settings"]["points_max"], 100000);
-    assert_eq!(war["lan"], json!({"open": false, "port": null}));
+    assert_eq!(
+        war["lan"],
+        json!({"open": false, "port": null, "internet": false})
+    );
     assert_eq!(
         admin(p, "GET", "/api/info", None).json()["wars"]
             .as_array()
@@ -791,7 +794,7 @@ fn lan_listener_serves_only_lan_wars_read_only() {
     let lan = r.json()["port"].as_u64().expect("a LAN port") as u16;
     assert_eq!(
         admin(h.port, "GET", &format!("/api/wars/{open_war}"), None).json()["lan"],
-        json!({"open": true, "port": lan})
+        json!({"open": true, "port": lan, "internet": false})
     );
 
     // Read-only, no token, LAN wars only.
@@ -871,7 +874,10 @@ fn lan_listener_serves_only_lan_wars_read_only() {
         &format!("/api/wars/{open_war}/lan"),
         Some(json!({"open": false})),
     );
-    assert_eq!(r.json(), json!({"open": false, "port": null}));
+    assert_eq!(
+        r.json(),
+        json!({"open": false, "port": null, "internet": false})
+    );
     std::thread::sleep(std::time::Duration::from_millis(300));
     assert!(
         TcpStream::connect(("127.0.0.1", lan)).is_err(),
@@ -1078,5 +1084,96 @@ fn a_full_war_takes_no_new_players() {
     };
     assert_eq!(ask("a1"), 200);
     assert_eq!(ask("newcomer"), 403);
+    h.shutdown();
+}
+
+#[test]
+fn only_a_war_open_to_the_internet_answers_callers_from_outside() {
+    use commander::http::{Req, Via, route};
+    let (data, ui) = (temp_dir("net"), temp_dir("net-ui"));
+    std::fs::write(ui.join("index.html"), "<!doctype html>").unwrap();
+    let h = start(&data, &ui);
+    let war = create_war(h.port, json!({}))["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let other = create_war(h.port, json!({}))["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let ask = |via: Via, method: &str, path: &str, body: &str| {
+        let req = Req {
+            method: method.into(),
+            path: path.into(),
+            query: Default::default(),
+            headers: vec![("X-Commander-Player".into(), PLAYER.into())],
+            body: body.as_bytes().to_vec(),
+        };
+        route(&h.app, &req, via).status
+    };
+    let lan = |body: Value| admin(h.port, "POST", &format!("/api/wars/{war}/lan"), Some(body));
+    let game = format!("/w/{war}/1.0/");
+    let status = "action=get_campaign_status";
+
+    // Open to LAN alone: the local network gets the war, the internet does not.
+    assert_eq!(lan(json!({"open": true})).json()["internet"], json!(false));
+    assert_eq!(
+        admin(
+            h.port,
+            "POST",
+            &format!("/api/wars/{other}/lan"),
+            Some(json!({"open": true}))
+        )
+        .status,
+        200
+    );
+    assert_eq!(ask(Via::Lan, "POST", &game, status), 200);
+    assert_eq!(ask(Via::Internet, "POST", &game, status), 404);
+    assert_eq!(
+        ask(Via::Internet, "GET", &format!("/api/wars/{war}"), ""),
+        404
+    );
+
+    // Open to the internet: this war answers, the other LAN war still does not.
+    let r = lan(json!({"open": true, "internet": true}));
+    assert_eq!(r.json()["internet"], json!(true));
+    assert_eq!(
+        admin(h.port, "GET", &format!("/api/wars/{war}"), None).json()["lan"]["internet"],
+        json!(true)
+    );
+    assert_eq!(ask(Via::Internet, "POST", &game, status), 200);
+    assert_eq!(
+        ask(Via::Internet, "GET", &format!("/api/wars/{war}"), ""),
+        200
+    );
+    assert_eq!(
+        ask(Via::Internet, "GET", "/", ""),
+        200,
+        "the read-only war screens"
+    );
+    assert_eq!(
+        ask(Via::Internet, "POST", &format!("/w/{other}/1.0/"), status),
+        404
+    );
+    assert_eq!(
+        ask(Via::Internet, "POST", "/api/wars", "{}"),
+        404,
+        "no admin call from outside"
+    );
+    assert_eq!(
+        ask(Via::Internet, "GET", &format!("/api/wars/{war}/export"), ""),
+        404
+    );
+
+    // `open` alone keeps the switch; closing the LAN closes the internet with it.
+    assert_eq!(lan(json!({"open": true})).json()["internet"], json!(true));
+    assert_eq!(lan(json!({"open": false})).json()["internet"], json!(false));
+    assert_eq!(ask(Via::Internet, "POST", &game, status), 404);
+    assert_eq!(
+        lan(json!({"open": true})).json()["internet"],
+        json!(false),
+        "it does not come back by itself"
+    );
+    assert_eq!(lan(json!({"open": true, "internet": "yes"})).status, 400);
     h.shutdown();
 }

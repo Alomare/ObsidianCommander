@@ -97,7 +97,7 @@ export interface War {
   settings: Settings;
   /** The Evolved war state; null for a Vanilla war. */
   evolved?: Evolved | null;
-  lan: { open: boolean; port: number | null };
+  lan: { open: boolean; port: number | null; internet?: boolean };
   server_time: number;
 }
 
@@ -216,7 +216,7 @@ export interface WarSummary {
   season?: number;
   state?: WarState;
   /** The server sends a boolean here; a full war sends {open, port}. */
-  lan?: boolean | { open: boolean; port: number | null };
+  lan?: boolean | { open: boolean; port: number | null; internet?: boolean };
   members?: number | Member[];
   players?: number;
   fronts?: FrontBrief[];

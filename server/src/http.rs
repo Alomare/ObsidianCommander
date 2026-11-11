@@ -15,7 +15,10 @@ pub const MAX_BODY: u64 = 8 * 1024 * 1024;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Via {
     Loopback,
+    /// The network listener, from an address of the local network.
     Lan,
+    /// The network listener, from any other address: only wars open to the internet answer.
+    Internet,
 }
 
 pub struct Req {
@@ -133,11 +136,16 @@ fn refuse(raw: tiny_http::Request, status: u16, msg: &str) {
 }
 
 fn handle(app: &Arc<App>, mut raw: tiny_http::Request, via: Via) {
+    let mut via = via;
     if via == Via::Lan
         && !app.cfg.lan_any_source
         && !raw.remote_addr().is_some_and(|a| lan_source_ok(a.ip()))
     {
-        return refuse(raw, 403, "local network only");
+        // From outside the local network: only while some war is open to the internet.
+        if !app.wars().values().any(|s| s.reachable(Via::Internet)) {
+            return refuse(raw, 403, "local network only");
+        }
+        via = Via::Internet;
     }
     let host = raw
         .headers()
@@ -238,7 +246,7 @@ fn game_route(app: &Arc<App>, req: &Req, via: Via, rest: &str) -> Resp {
     let Some(slot) = wars.get_mut(id) else {
         return Resp::not_found();
     };
-    if via == Via::Lan && !slot.lan_open {
+    if !slot.reachable(via) {
         return Resp::not_found();
     }
     if !slot.war.has_room(&player) {
@@ -264,7 +272,7 @@ fn evolved_route(app: &Arc<App>, req: &Req, via: Via, id: &str, what: &str) -> R
     let Some(slot) = wars.get_mut(id) else {
         return Resp::not_found();
     };
-    if via == Via::Lan && !slot.lan_open {
+    if !slot.reachable(via) {
         return Resp::not_found();
     }
     if !slot.war.is_evolved() {
@@ -411,7 +419,7 @@ fn static_route(app: &App, req: &Req, via: Via) -> Resp {
         return index();
     }
     let is_asset = path.starts_with("/assets/");
-    if via == Via::Lan && !is_asset {
+    if via != Via::Loopback && !is_asset {
         return Resp::not_found();
     }
     let Some(file) = safe_join(root, path) else {

@@ -37,22 +37,24 @@ fn body_object(req: &Req) -> Result<Map<String, Value>, Resp> {
 }
 
 fn war_view(app: &App, slot: &WarSlot, now: i64) -> Value {
-    slot.war.admin_view(now, slot.lan_open, app.lan_port())
+    let mut v = slot.war.admin_view(now, slot.lan_open, app.lan_port());
+    v["lan"]["internet"] = json!(slot.lan_open && slot.internet_open);
+    v
 }
 
 pub fn route(app: &Arc<App>, req: &Req, via: Via) -> Resp {
     let parts: Vec<&str> = req.path.trim_end_matches('/').split('/').skip(2).collect();
     let m = req.method.as_str();
 
-    if via == Via::Lan {
+    if via != Via::Loopback {
         if m != "GET" {
             return Resp::not_found();
         }
         return match parts.as_slice() {
-            ["info"] => info(app, true),
-            ["wars", id] => lan_read(app, id, |slot, now| war_view(app, slot, now)),
-            ["wars", id, "feed"] => lan_read(app, id, |slot, _| feed(slot, req)),
-            ["wars", id, "history"] => lan_read(app, id, |slot, _| history(slot, req)),
+            ["info"] => info(app, via),
+            ["wars", id] => lan_read(app, via, id, |slot, now| war_view(app, slot, now)),
+            ["wars", id, "feed"] => lan_read(app, via, id, |slot, _| feed(slot, req)),
+            ["wars", id, "history"] => lan_read(app, via, id, |slot, _| history(slot, req)),
             _ => Resp::not_found(),
         };
     }
@@ -61,7 +63,7 @@ pub fn route(app: &Arc<App>, req: &Req, via: Via) -> Resp {
         return Resp::error(401, "missing or wrong admin token");
     }
     match (m, parts.as_slice()) {
-        ("GET", ["info"]) => info(app, false),
+        ("GET", ["info"]) => info(app, Via::Loopback),
         ("POST", ["wars"]) => create(app, req),
         ("POST", ["wars", "import"]) => import(app, req),
         ("GET", ["wars", id]) => read(app, id, |slot, now| {
@@ -83,12 +85,12 @@ pub fn route(app: &Arc<App>, req: &Req, via: Via) -> Resp {
     }
 }
 
-fn info(app: &App, lan_only: bool) -> Resp {
+fn info(app: &App, via: Via) -> Resp {
     let now = now_unix();
     let wars: Vec<Value> = app
         .wars()
         .values()
-        .filter(|s| !lan_only || s.lan_open)
+        .filter(|s| s.reachable(via))
         .map(|s| s.war.summary(now, s.lan_open))
         .collect();
     Resp::json(
@@ -105,9 +107,9 @@ fn read(app: &App, id: &str, f: impl FnOnce(&WarSlot, i64) -> Resp) -> Resp {
     }
 }
 
-fn lan_read(app: &App, id: &str, f: impl FnOnce(&WarSlot, i64) -> Value) -> Resp {
+fn lan_read(app: &App, via: Via, id: &str, f: impl FnOnce(&WarSlot, i64) -> Value) -> Resp {
     let wars = app.wars();
-    match wars.get(id).filter(|s| s.lan_open) {
+    match wars.get(id).filter(|s| s.reachable(via)) {
         Some(slot) => Resp::json(200, &f(slot, now_unix())),
         None => Resp::not_found(),
     }
@@ -441,26 +443,40 @@ fn set_lan(app: &Arc<App>, req: &Req, id: &str) -> Resp {
     let Some(open) = body.get("open").and_then(Value::as_bool) else {
         return Resp::error(400, "`open` must be true or false");
     };
-    {
+    // `internet` is optional: left out, a war that stays open keeps what it had.
+    let internet = match body.get("internet") {
+        None => None,
+        Some(Value::Bool(b)) => Some(*b),
+        Some(_) => return Resp::error(400, "`internet` must be true or false"),
+    };
+    let internet = {
         let mut wars = app.wars();
         let Some(slot) = wars.get_mut(id) else {
             return Resp::error(404, "no such war");
         };
         slot.lan_open = open;
-    }
+        slot.internet_open = open && internet.unwrap_or(slot.internet_open);
+        slot.internet_open
+    };
     if let Err(e) = lan::sync(app) {
         if let Some(slot) = app.wars().get_mut(id) {
             slot.lan_open = false;
+            slot.internet_open = false;
         }
         return Resp::error(500, &e);
     }
     app.log.line(&format!(
-        "war {id} LAN {}",
-        if open { "open" } else { "closed" }
+        "war {id} LAN {}{}",
+        if open { "open" } else { "closed" },
+        if internet {
+            ", open to the internet"
+        } else {
+            ""
+        }
     ));
     Resp::json(
         200,
-        &json!({"open": open, "port": if open { app.lan_port() } else { None }}),
+        &json!({"open": open, "port": if open { app.lan_port() } else { None }, "internet": internet}),
     )
 }
 

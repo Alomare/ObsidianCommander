@@ -45,7 +45,7 @@ Opening a war to LAN starts a second listener on `0.0.0.0:<lan port>` (default 1
 
 Everything else answers 404 on the LAN listener. The listener closes when no war is open to LAN.
 
-The LAN listener answers callers from loopback, the private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), link-local addresses and the ranges VPN tools hand out (100.64.0.0/10, 25.0.0.0/8); any other address gets 403. Both listeners answer 403 to a request whose `Host` header is a public site name (an address, a name without dots and a `.local` name pass). A war keeps at most 5000 players: a new player id past that gets 403.
+The LAN listener answers callers from loopback, the private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), link-local addresses and the ranges VPN tools hand out (100.64.0.0/10, 25.0.0.0/8). A caller from any other address reaches only the wars open to the internet (`internet: true` in the `lan` call below), with the same routes as a LAN caller, and gets 403 while no war is. Both listeners answer 403 to a request whose `Host` header is a public site name (an address, a name without dots and a `.local` name pass). A war keeps at most 5000 players: a new player id past that gets 403.
 
 ### LAN discovery
 
@@ -130,7 +130,7 @@ JSON over HTTP on the loopback listener. Every call needs the admin token, excep
 | `POST /api/wars/<id>/actions` | one GM action (below). Answers the war |
 | `GET /api/wars/<id>/feed?after=<id>&limit=<n>` | feed entries, newest last |
 | `GET /api/wars/<id>/history?from=<time>` | snapshots, for charts |
-| `POST /api/wars/<id>/lan` | `{open: true|false}`. Answers `{open, port}` |
+| `POST /api/wars/<id>/lan` | `{open: true|false, internet?: true|false}`. `internet` lets callers from outside the local network reach the war; left out, a war that stays open keeps what it had, and closing the LAN closes it. Neither is kept over a server restart. Answers `{open, port, internet}` |
 | `GET /api/wars/<id>/export` | the war as one JSON file |
 | `POST /api/wars/import` | a war from that file (new id) |
 
@@ -153,7 +153,7 @@ JSON over HTTP on the loopback listener. Every call needs the admin token, excep
                "defend_chance_per_hour": 0.08, "defend_duration": 14400, "defend_points": 3000,
                "defend_mission_value": 150, "defend_reward": 3000, "attack_duration": 21600,
                "attack_points": 5000, "attack_mission_value": 150, "director": true},
-  "lan": {"open": false, "port": null},
+  "lan": {"open": false, "port": null, "internet": false},
   "server_time": 1794258123
 }
 ```
