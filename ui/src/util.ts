@@ -98,3 +98,22 @@ export function feedTone(e: FeedEntry): "good" | "bad" | "event" | "gm" | "plain
   if (/started/.test(e.text_key)) return "event";
   return "plain";
 }
+
+/** Puts text on the clipboard. Inside the Obsidian frame the clipboard API may be refused, so a hidden
+    field and the copy command stand in. Answers whether it worked. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch { /* refused: the older way below */ }
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.appendChild(field);
+  field.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { ok = false; }
+  field.remove();
+  return ok;
+}

@@ -30,6 +30,31 @@ pub struct WarSlot {
     pub lan_open: bool,
     /// Whether callers from outside the local network reach the war too. Only with `lan_open`.
     pub internet_open: bool,
+    /// The invite code a caller from outside the local network has to give. Made the first time
+    /// the war opens to the internet and kept in `invite.txt`, so friends keep the one they got.
+    pub invite: String,
+}
+
+/// The letters of an invite code: no 0, 1, I or O, which read alike.
+const INVITE_LETTERS: &[u8; 32] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+/// A new invite code from the system random source: ten letters, 50 bits, written `XXXXX-XXXXX`.
+pub fn new_invite() -> io::Result<String> {
+    let mut raw = [0u8; 10];
+    getrandom::fill(&mut raw).map_err(|e| io::Error::other(e.to_string()))?;
+    let code: String = raw
+        .iter()
+        .map(|b| INVITE_LETTERS[(b & 31) as usize] as char)
+        .collect();
+    Ok(format!("{}-{}", &code[..5], &code[5..]))
+}
+
+/// An invite code as typed, for comparing: letters and digits only, upper case.
+pub fn plain_invite(code: &str) -> String {
+    code.chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_uppercase())
+        .collect()
 }
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -62,6 +87,34 @@ fn read_lines<T: for<'de> Deserialize<'de>>(path: &Path) -> Vec<T> {
 }
 
 impl WarSlot {
+    /// Whether a request that came `via` this way, with this invite code, gets the war. A caller
+    /// from outside the local network needs the code; the comparison takes the same time whatever
+    /// part of it matches.
+    pub fn admits(&self, via: crate::http::Via, key: Option<&str>) -> bool {
+        if via != crate::http::Via::Internet {
+            return self.reachable(via);
+        }
+        let (given, want) = (plain_invite(key.unwrap_or("")), plain_invite(&self.invite));
+        self.reachable(via)
+            && !want.is_empty()
+            && given.len() == want.len()
+            && given
+                .bytes()
+                .zip(want.bytes())
+                .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+                == 0
+    }
+
+    /// Gives the war an invite code if it has none, or a new one when `fresh`, and keeps it on disk.
+    pub fn ensure_invite(&mut self, fresh: bool) -> io::Result<()> {
+        if fresh || plain_invite(&self.invite).is_empty() {
+            self.invite = new_invite()?;
+            fs::create_dir_all(&self.dir)?;
+            fs::write(self.dir.join("invite.txt"), &self.invite)?;
+        }
+        Ok(())
+    }
+
     /// Whether a request that came `via` this way gets the war.
     pub fn reachable(&self, via: crate::http::Via) -> bool {
         match via {
@@ -80,6 +133,7 @@ impl WarSlot {
             dir,
             lan_open: false,
             internet_open: false,
+            invite: String::new(),
         }
     }
 
@@ -93,6 +147,9 @@ impl WarSlot {
             dir: dir.to_path_buf(),
             lan_open: false,
             internet_open: false,
+            invite: fs::read_to_string(dir.join("invite.txt"))
+                .map(|t| t.trim().to_string())
+                .unwrap_or_default(),
         })
     }
 

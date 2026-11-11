@@ -63,7 +63,7 @@ helldivers.exe ──► Obsidian relay ══ encrypted link ══► Obsidian
 | **LAN** | Friends on the same network | None. Obsidian finds the war on the local network |
 | **Invite link** (above) | Friends over the internet, host plays too | None |
 | **Always-on server** | A community war that runs day and night | The same server program on a rented server or a home server (Docker). Joined by address and invite. HTTPS with a real certificate |
-| **Open to Internet** (built, 2026-11-11) | Friends over the internet, with a port forwarded on the host router, or a tunnel such as Tailscale or playit.gg | The host switches **Internet** on beside **LAN** on the war screen and forwards the TCP port shown there. Friends type the address under **Join by Address** in Obsidian. Plain HTTP, and players are who the game says they are: for trusted friends, until the invite link is built |
+| **Open to Internet** (built, 2026-11-11) | Friends over the internet, with a port forwarded on the host router, or a tunnel such as Tailscale or playit.gg | The host switches **Internet** on beside **LAN** on the war screen and forwards the TCP port shown there. The war screen shows an **invite code**; friends type the address and the code under **Join by Address** in Obsidian, and a caller without the code gets nothing. Plain HTTP, and players are who the game says they are: for trusted friends, until the invite link is built |
 
 **Move to a server:** a war started at home can be exported and loaded on a server later. Members keep the places they had, and the invite link points to the new address.
 

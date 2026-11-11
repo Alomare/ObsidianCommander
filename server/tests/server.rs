@@ -876,7 +876,7 @@ fn lan_listener_serves_only_lan_wars_read_only() {
     );
     assert_eq!(
         r.json(),
-        json!({"open": false, "port": null, "internet": false})
+        json!({"open": false, "port": null, "internet": false, "invite": null})
     );
     std::thread::sleep(std::time::Duration::from_millis(300));
     assert!(
@@ -1088,7 +1088,7 @@ fn a_full_war_takes_no_new_players() {
 }
 
 #[test]
-fn only_a_war_open_to_the_internet_answers_callers_from_outside() {
+fn only_a_war_open_to_the_internet_answers_callers_from_outside_and_only_with_the_invite() {
     use commander::http::{Req, Via, route};
     let (data, ui) = (temp_dir("net"), temp_dir("net-ui"));
     std::fs::write(ui.join("index.html"), "<!doctype html>").unwrap();
@@ -1101,22 +1101,32 @@ fn only_a_war_open_to_the_internet_answers_callers_from_outside() {
         .as_str()
         .unwrap()
         .to_string();
-    let ask = |via: Via, method: &str, path: &str, body: &str| {
+    let ask = |via: Via, method: &str, path: &str, body: &str, key: Option<&str>| {
+        let mut headers = vec![("X-Commander-Player".to_string(), PLAYER.to_string())];
+        if let Some(k) = key {
+            headers.push(("X-Commander-Key".to_string(), k.to_string()));
+        }
         let req = Req {
             method: method.into(),
             path: path.into(),
             query: Default::default(),
-            headers: vec![("X-Commander-Player".into(), PLAYER.into())],
+            headers,
             body: body.as_bytes().to_vec(),
         };
-        route(&h.app, &req, via).status
+        let r = route(&h.app, &req, via);
+        (r.status, String::from_utf8_lossy(&r.body).to_string())
     };
     let lan = |body: Value| admin(h.port, "POST", &format!("/api/wars/{war}/lan"), Some(body));
     let game = format!("/w/{war}/1.0/");
+    let view = format!("/api/wars/{war}");
     let status = "action=get_campaign_status";
 
-    // Open to LAN alone: the local network gets the war, the internet does not.
-    assert_eq!(lan(json!({"open": true})).json()["internet"], json!(false));
+    // Open to LAN alone: the local network gets the war, the internet does not, and no code is made.
+    let r = lan(json!({"open": true})).json();
+    assert_eq!(
+        (r["internet"].clone(), r["invite"].clone()),
+        (json!(false), json!(null))
+    );
     assert_eq!(
         admin(
             h.port,
@@ -1127,53 +1137,138 @@ fn only_a_war_open_to_the_internet_answers_callers_from_outside() {
         .status,
         200
     );
-    assert_eq!(ask(Via::Lan, "POST", &game, status), 200);
-    assert_eq!(ask(Via::Internet, "POST", &game, status), 404);
+    assert_eq!(ask(Via::Lan, "POST", &game, status, None).0, 200);
     assert_eq!(
-        ask(Via::Internet, "GET", &format!("/api/wars/{war}"), ""),
+        ask(Via::Internet, "POST", &game, status, Some("ANY")).0,
         404
     );
 
-    // Open to the internet: this war answers, the other LAN war still does not.
-    let r = lan(json!({"open": true, "internet": true}));
-    assert_eq!(r.json()["internet"], json!(true));
-    assert_eq!(
-        admin(h.port, "GET", &format!("/api/wars/{war}"), None).json()["lan"]["internet"],
-        json!(true)
+    // Open to the internet: an invite code is made, and only the host is told it.
+    let r = lan(json!({"open": true, "internet": true})).json();
+    let code = r["invite"].as_str().expect("an invite code").to_string();
+    assert_eq!(code.len(), 11, "{code}");
+    assert_eq!(code.as_bytes()[5], b'-');
+    assert!(
+        code.chars()
+            .all(|c| c == '-' || "23456789ABCDEFGHJKLMNPQRSTUVWXYZ".contains(c)),
+        "{code}"
     );
-    assert_eq!(ask(Via::Internet, "POST", &game, status), 200);
     assert_eq!(
-        ask(Via::Internet, "GET", &format!("/api/wars/{war}"), ""),
+        admin(h.port, "GET", &view, None).json()["lan"],
+        json!({"open": true, "port": r["port"], "internet": true, "invite": code})
+    );
+    let (s, seen) = ask(Via::Lan, "GET", &view, "", None);
+    assert_eq!(s, 200);
+    assert!(
+        !seen.contains(&code) && !seen.contains("invite"),
+        "a LAN guest is not told the code"
+    );
+
+    // From outside: nothing without the code or with a wrong one; the war with the right one.
+    assert_eq!(ask(Via::Internet, "POST", &game, status, None).0, 404);
+    assert_eq!(
+        ask(Via::Internet, "POST", &game, status, Some("AAAAA-AAAAA")).0,
+        404
+    );
+    assert_eq!(ask(Via::Internet, "GET", &view, "", Some("")).0, 404);
+    assert_eq!(
+        ask(Via::Internet, "POST", &game, status, Some(&code)).0,
         200
     );
+    let typed = code.to_lowercase().replace('-', " ");
     assert_eq!(
-        ask(Via::Internet, "GET", "/", ""),
+        ask(Via::Internet, "POST", &game, status, Some(&typed)).0,
         200,
-        "the read-only war screens"
+        "as a player types it"
     );
+    let (s, seen) = ask(Via::Internet, "GET", &view, "", Some(&code));
+    assert_eq!(s, 200);
+    assert!(!seen.contains(&code), "the answer does not repeat the code");
     assert_eq!(
-        ask(Via::Internet, "POST", &format!("/w/{other}/1.0/"), status),
+        ask(Via::Internet, "GET", "/", "", None).0,
+        200,
+        "the read-only war screens load"
+    );
+
+    // The list of wars names a war only to a caller with the code of that war.
+    let listed = |key: Option<&str>| {
+        let (_, body) = ask(Via::Internet, "GET", "/api/info", "", key);
+        serde_json::from_str::<Value>(&body).unwrap()["wars"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| w["id"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+    assert!(listed(None).is_empty());
+    assert_eq!(listed(Some(&code)), vec![war.clone()]);
+    assert_eq!(
+        ask(
+            Via::Internet,
+            "POST",
+            &format!("/w/{other}/1.0/"),
+            status,
+            Some(&code)
+        )
+        .0,
         404
     );
     assert_eq!(
-        ask(Via::Internet, "POST", "/api/wars", "{}"),
+        ask(Via::Internet, "POST", "/api/wars", "{}", Some(&code)).0,
         404,
         "no admin call from outside"
     );
     assert_eq!(
-        ask(Via::Internet, "GET", &format!("/api/wars/{war}/export"), ""),
+        ask(
+            Via::Internet,
+            "GET",
+            &format!("{view}/export"),
+            "",
+            Some(&code)
+        )
+        .0,
         404
     );
 
-    // `open` alone keeps the switch; closing the LAN closes the internet with it.
-    assert_eq!(lan(json!({"open": true})).json()["internet"], json!(true));
-    assert_eq!(lan(json!({"open": false})).json()["internet"], json!(false));
-    assert_eq!(ask(Via::Internet, "POST", &game, status), 404);
+    // `open` alone keeps the switch and the code; a new code shuts the old one out.
+    let r = lan(json!({"open": true})).json();
     assert_eq!(
-        lan(json!({"open": true})).json()["internet"],
-        json!(false),
-        "it does not come back by itself"
+        (r["internet"].clone(), r["invite"].clone()),
+        (json!(true), json!(code))
     );
+    let fresh = lan(json!({"open": true, "internet": true, "new_invite": true})).json()["invite"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_ne!(fresh, code);
+    assert_eq!(
+        ask(Via::Internet, "POST", &game, status, Some(&code)).0,
+        404
+    );
+    assert_eq!(
+        ask(Via::Internet, "POST", &game, status, Some(&fresh)).0,
+        200
+    );
+
+    // Closing the LAN closes the internet with it, and it does not come back by itself.
+    assert_eq!(lan(json!({"open": false})).json()["internet"], json!(false));
+    assert_eq!(
+        ask(Via::Internet, "POST", &game, status, Some(&fresh)).0,
+        404
+    );
+    assert_eq!(lan(json!({"open": true})).json()["internet"], json!(false));
     assert_eq!(lan(json!({"open": true, "internet": "yes"})).status, 400);
+    h.shutdown();
+
+    // After a restart the war is closed again, and opening it gives the code friends already have.
+    let h = start(&data, &ui);
+    let r = admin(
+        h.port,
+        "POST",
+        &format!("/api/wars/{war}/lan"),
+        Some(json!({"open": true, "internet": true})),
+    )
+    .json();
+    assert_eq!(r["invite"], json!(fresh));
     h.shutdown();
 }

@@ -12,7 +12,7 @@ export interface Api {
   feed(id: string, after?: number, limit?: number): Promise<FeedEntry[]>;
   history(id: string, from?: number): Promise<Snapshot[]>;
   /** Opens or closes a war to the local network; `internet` also lets callers from outside reach it. */
-  lan(id: string, open: boolean, internet?: boolean): Promise<{ open: boolean; port: number | null; internet?: boolean }>;
+  lan(id: string, open: boolean, internet?: boolean, newInvite?: boolean): Promise<{ open: boolean; port: number | null; internet?: boolean; invite?: string | null }>;
   exportWar(id: string): Promise<Blob>;
   importWar(file: unknown): Promise<War>;
 }
@@ -36,12 +36,16 @@ if (params.has("token")) {
   history.replaceState(null, "", location.pathname + (q ? `?${q}` : "") + location.hash);
 }
 
+/** The invite code of a war opened from outside the host network: Obsidian puts it in the address. */
+const inviteKey: string | null = params.get("key");
+
 export const hasToken = () => !!token;
 export const isMock = new URLSearchParams(location.search).get("mock") === "1";
 
 async function call<T>(method: string, path: string, body?: unknown, raw = false): Promise<T> {
   const headers: Record<string, string> = {};
   if (token) headers["X-Commander-Token"] = token;
+  if (inviteKey) headers["X-Commander-Key"] = inviteKey;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!res.ok) {
@@ -97,7 +101,7 @@ const http: Api = {
     const q = from != null ? `?from=${from}` : "";
     return listOf(await call("GET", `api/wars/${enc(id)}/history${q}`), "snapshots", "history").map(normSnapshot);
   },
-  lan: (id, open, internet) => call("POST", `api/wars/${enc(id)}/lan`, internet === undefined ? { open } : { open, internet }),
+  lan: (id, open, internet, newInvite) => call("POST", `api/wars/${enc(id)}/lan`, { open, ...(internet === undefined ? {} : { internet }), ...(newInvite ? { new_invite: true } : {}) }),
   exportWar: (id) => call("GET", `api/wars/${enc(id)}/export`, undefined, true),
   importWar: (file) => call("POST", "api/wars/import", file),
 };

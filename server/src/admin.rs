@@ -36,9 +36,14 @@ fn body_object(req: &Req) -> Result<Map<String, Value>, Resp> {
     }
 }
 
-fn war_view(app: &App, slot: &WarSlot, now: i64) -> Value {
+/// The war for the war screens. Only the host (loopback) is told the invite code.
+fn war_view(app: &App, slot: &WarSlot, now: i64, via: Via) -> Value {
     let mut v = slot.war.admin_view(now, slot.lan_open, app.lan_port());
-    v["lan"]["internet"] = json!(slot.lan_open && slot.internet_open);
+    let internet = slot.lan_open && slot.internet_open;
+    v["lan"]["internet"] = json!(internet);
+    if via == Via::Loopback && internet {
+        v["lan"]["invite"] = json!(slot.invite);
+    }
     v
 }
 
@@ -51,10 +56,10 @@ pub fn route(app: &Arc<App>, req: &Req, via: Via) -> Resp {
             return Resp::not_found();
         }
         return match parts.as_slice() {
-            ["info"] => info(app, via),
-            ["wars", id] => lan_read(app, via, id, |slot, now| war_view(app, slot, now)),
-            ["wars", id, "feed"] => lan_read(app, via, id, |slot, _| feed(slot, req)),
-            ["wars", id, "history"] => lan_read(app, via, id, |slot, _| history(slot, req)),
+            ["info"] => info(app, via, req.key()),
+            ["wars", id] => lan_read(app, via, req, id, |slot, now| war_view(app, slot, now, via)),
+            ["wars", id, "feed"] => lan_read(app, via, req, id, |slot, _| feed(slot, req)),
+            ["wars", id, "history"] => lan_read(app, via, req, id, |slot, _| history(slot, req)),
             _ => Resp::not_found(),
         };
     }
@@ -63,11 +68,11 @@ pub fn route(app: &Arc<App>, req: &Req, via: Via) -> Resp {
         return Resp::error(401, "missing or wrong admin token");
     }
     match (m, parts.as_slice()) {
-        ("GET", ["info"]) => info(app, Via::Loopback),
+        ("GET", ["info"]) => info(app, Via::Loopback, None),
         ("POST", ["wars"]) => create(app, req),
         ("POST", ["wars", "import"]) => import(app, req),
         ("GET", ["wars", id]) => read(app, id, |slot, now| {
-            Resp::json(200, &war_view(app, slot, now))
+            Resp::json(200, &war_view(app, slot, now, Via::Loopback))
         }),
         ("PATCH", ["wars", id]) => patch(app, req, id),
         ("DELETE", ["wars", id]) => delete(app, id),
@@ -85,12 +90,12 @@ pub fn route(app: &Arc<App>, req: &Req, via: Via) -> Resp {
     }
 }
 
-fn info(app: &App, via: Via) -> Resp {
+fn info(app: &App, via: Via, key: Option<&str>) -> Resp {
     let now = now_unix();
     let wars: Vec<Value> = app
         .wars()
         .values()
-        .filter(|s| s.reachable(via))
+        .filter(|s| s.admits(via, key))
         .map(|s| s.war.summary(now, s.lan_open))
         .collect();
     Resp::json(
@@ -107,9 +112,15 @@ fn read(app: &App, id: &str, f: impl FnOnce(&WarSlot, i64) -> Resp) -> Resp {
     }
 }
 
-fn lan_read(app: &App, via: Via, id: &str, f: impl FnOnce(&WarSlot, i64) -> Value) -> Resp {
+fn lan_read(
+    app: &App,
+    via: Via,
+    req: &Req,
+    id: &str,
+    f: impl FnOnce(&WarSlot, i64) -> Value,
+) -> Resp {
     let wars = app.wars();
-    match wars.get(id).filter(|s| s.reachable(via)) {
+    match wars.get(id).filter(|s| s.admits(via, req.key())) {
         Some(slot) => Resp::json(200, &f(slot, now_unix())),
         None => Resp::not_found(),
     }
@@ -308,7 +319,7 @@ fn create(app: &App, req: &Req) -> Resp {
         return Resp::error(500, &format!("could not write the war: {e}"));
     }
     app.log.line(&format!("war {id} created: {name}"));
-    let view = war_view(app, &slot, now);
+    let view = war_view(app, &slot, now, Via::Loopback);
     wars.insert(id, slot);
     Resp::json(201, &view)
 }
@@ -354,7 +365,7 @@ fn import(app: &App, req: &Req) -> Resp {
         return Resp::error(500, &format!("could not write the war: {e}"));
     }
     app.log.line(&format!("war {id} imported"));
-    let view = war_view(app, &slot, now);
+    let view = war_view(app, &slot, now, Via::Loopback);
     wars.insert(id, slot);
     Resp::json(201, &view)
 }
@@ -417,7 +428,7 @@ fn patch(app: &App, req: &Req, id: &str) -> Resp {
         slot.war.check_triggers(now, &mut out);
     }
     app.commit(slot, out, now);
-    Resp::json(200, &war_view(app, slot, now))
+    Resp::json(200, &war_view(app, slot, now, Via::Loopback))
 }
 
 fn delete(app: &Arc<App>, id: &str) -> Resp {
@@ -449,14 +460,20 @@ fn set_lan(app: &Arc<App>, req: &Req, id: &str) -> Resp {
         Some(Value::Bool(b)) => Some(*b),
         Some(_) => return Resp::error(400, "`internet` must be true or false"),
     };
-    let internet = {
+    let new_invite = body.get("new_invite").and_then(Value::as_bool) == Some(true);
+    let (internet, invite) = {
         let mut wars = app.wars();
         let Some(slot) = wars.get_mut(id) else {
             return Resp::error(404, "no such war");
         };
+        let wanted = open && internet.unwrap_or(slot.internet_open);
+        // No war opens to the internet without an invite code.
+        if wanted && let Err(e) = slot.ensure_invite(new_invite) {
+            return Resp::error(500, &format!("could not make the invite code: {e}"));
+        }
         slot.lan_open = open;
-        slot.internet_open = open && internet.unwrap_or(slot.internet_open);
-        slot.internet_open
+        slot.internet_open = wanted;
+        (wanted, wanted.then(|| slot.invite.clone()))
     };
     if let Err(e) = lan::sync(app) {
         if let Some(slot) = app.wars().get_mut(id) {
@@ -476,7 +493,7 @@ fn set_lan(app: &Arc<App>, req: &Req, id: &str) -> Resp {
     ));
     Resp::json(
         200,
-        &json!({"open": open, "port": if open { app.lan_port() } else { None }, "internet": internet}),
+        &json!({"open": open, "port": if open { app.lan_port() } else { None }, "internet": internet, "invite": invite}),
     )
 }
 
@@ -671,7 +688,7 @@ fn action(app: &App, req: &Req, id: &str) -> Resp {
             Ok(()) => {
                 app.log.line(&format!("war {id}: GM {name}"));
                 app.commit(slot, out, now);
-                Resp::json(200, &war_view(app, slot, now))
+                Resp::json(200, &war_view(app, slot, now, Via::Loopback))
             }
             Err(e) => {
                 app.commit(slot, out, now);
@@ -690,7 +707,7 @@ fn action(app: &App, req: &Req, id: &str) -> Resp {
             out.changed = true;
             app.log.line(&format!("war {id}: GM {name}"));
             app.commit(slot, out, now);
-            Resp::json(200, &war_view(app, slot, now))
+            Resp::json(200, &war_view(app, slot, now, Via::Loopback))
         }
         Err(e) => {
             // A refused action may still have moved nothing; keep whatever it did record.

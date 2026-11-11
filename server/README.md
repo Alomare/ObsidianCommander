@@ -29,6 +29,7 @@ When listening it prints `COMMANDER READY port=<port> version=<version> protocol
 <data>/wars/<id>/war.json       the war: fronts, events, settings, members, indexes (rewritten atomically)
 <data>/wars/<id>/feed.jsonl     feed entries, one per line, appended
 <data>/wars/<id>/history.jsonl  snapshots, one per line, appended
+<data>/wars/<id>/invite.txt     the invite code, once the war was opened to the internet
 ```
 
 The war clock (`war_time`) is stored with the war: no time passes while the server is closed, and one tick never counts more than 60 seconds.
@@ -38,7 +39,7 @@ The war clock (`war_time`) is stored with the war: no time passes while the serv
 - `POST /w/<id>/1.0/`: the war API the game calls (form-encoded `action=...`). Player id from `X-Commander-Player` (`local` when missing), name from `X-Commander-Name` (percent-encoded if not ASCII).
 - `/api/...`: the admin API (spec section 5). `GET /api/wars/<id>/feed?after=&limit=` answers `{entries, last_id}`; `GET /api/wars/<id>/history?from=` answers `{snapshots: [{season, time, war_time, data: [{points, points_taken, status}]}]}`.
 - Anything else under `GET`: files from the interface folder, with `index.html` for paths without an extension.
-- The LAN listener (`0.0.0.0`, only while a war is open to LAN) answers only the game API and read-only calls of LAN wars, `/` and `/assets/*`. A caller outside the private, link-local and VPN ranges reaches only the wars the host opened to the internet (`--lan-any-source` treats every caller as local), and both listeners refuse a `Host` header that names a public site. A war keeps at most 5000 players; past that, a new player id gets 403. Discovery broadcasts go to UDP 17493 every 3 seconds.
+- The LAN listener (`0.0.0.0`, only while a war is open to LAN) answers only the game API and read-only calls of LAN wars, `/` and `/assets/*`. A caller outside the private, link-local and VPN ranges reaches only the wars the host opened to the internet and only with the invite code of the war (`X-Commander-Key`, or `key` in the address; `--lan-any-source` treats every caller as local), and both listeners refuse a `Host` header that names a public site. A war keeps at most 5000 players; past that, a new player id gets 403. Discovery broadcasts go to UDP 17493 every 3 seconds.
 
 ## Tests
 

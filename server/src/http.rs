@@ -30,6 +30,12 @@ pub struct Req {
 }
 
 impl Req {
+    /// The invite code a caller gave: the `X-Commander-Key` header, or `key` in the address.
+    pub fn key(&self) -> Option<&str> {
+        self.header("X-Commander-Key")
+            .or_else(|| self.query.get("key").map(String::as_str))
+    }
+
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
@@ -246,7 +252,7 @@ fn game_route(app: &Arc<App>, req: &Req, via: Via, rest: &str) -> Resp {
     let Some(slot) = wars.get_mut(id) else {
         return Resp::not_found();
     };
-    if !slot.reachable(via) {
+    if !slot.admits(via, req.key()) {
         return Resp::not_found();
     }
     if !slot.war.has_room(&player) {
@@ -272,7 +278,7 @@ fn evolved_route(app: &Arc<App>, req: &Req, via: Via, id: &str, what: &str) -> R
     let Some(slot) = wars.get_mut(id) else {
         return Resp::not_found();
     };
-    if !slot.reachable(via) {
+    if !slot.admits(via, req.key()) {
         return Resp::not_found();
     }
     if !slot.war.is_evolved() {

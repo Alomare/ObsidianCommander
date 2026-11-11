@@ -5,7 +5,7 @@ import { playModel, selectWar, useHost } from "../bridge";
 import { useNow, useTween, useWarData } from "../hooks";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";
-import { clock, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
+import { clock, copyText, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
 import { evoOf } from "../evolved";
 import { FACTION_ACCENT, GalaxyMap, HELLDIVER_ACCENT, type Selection } from "../map/GalaxyMap";
 import { CommandPanel } from "./CommandPanel";
@@ -43,7 +43,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const now = useNow(1000);
   const [selection, setSelection] = useState<Selection>(mockStart.sel);
   const [tab, setTab] = useState<Tab>(mockStart.tab);
-  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "lan" | "internet" | SeasonAsk>(null);
+  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "lan" | "internet" | "invite" | SeasonAsk>(null);
   const [result, setResult] = useState<"won" | "lost">("won");
 
   /** A Game Master action; true when the server took it. */
@@ -105,9 +105,9 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
       notify(e instanceof Error ? e.message : String(e), true);
     }
   };
-  const setLan = async (open: boolean, internet?: boolean) => {
+  const setLan = async (open: boolean, internet?: boolean, newInvite?: boolean) => {
     try {
-      const lan = await api.lan(war.id, open, internet);
+      const lan = await api.lan(war.id, open, internet, newInvite);
       accept({ ...war, lan });
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e), true);
@@ -175,12 +175,16 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
             <Switch on={!!war.lan.internet} onChange={(on) => (on ? setDialog("internet") : setLan(true, false))} label={t("internet")} />
           </label>
         )}
+        {!readOnly && war.lan.open && war.lan.internet && war.lan.invite && (
+          <button className="btn invite-btn" onClick={() => setDialog("invite")} data-tip-title={t("invite")} data-tip={t("inviteTip")}>{war.lan.invite}</button>
+        )}
         {!readOnly && (
           <div className="bar-tools">
             <button className="btn icon" onClick={() => setDialog("settings")} aria-label={t("settings")} data-tip={t("settings")}><IGear /></button>
             <MenuButton label={t("more")} icon={<IMore />} items={[
               { label: t("editInfo"), icon: <IEdit />, run: () => setDialog("info") },
               { label: t("exportWar"), icon: <IExport />, run: exportWar },
+              ...(war.lan.open && war.lan.internet && war.lan.invite ? [{ label: t("invite"), icon: <IGlobe />, run: () => setDialog("invite") }] : []),
               { label: t("deleteWar"), icon: <ITrash />, danger: true, run: () => setDialog("delete") },
             ]} />
           </div>
@@ -247,6 +251,15 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
       {dialog === "internet" && (
         <Confirm title={t("internet")} text={t("internetText", { port: war.lan.port ?? 17494 })} okLabel={t("internet")} onClose={() => setDialog(null)}
           onOk={() => setLan(true, true)} />
+      )}
+      {dialog === "invite" && war.lan.invite && (
+        <Confirm title={t("invite")} text={t("inviteText", { port: war.lan.port ?? 17494 })} okLabel={t("inviteCopy")} onClose={() => setDialog(null)}
+          onOk={() => copyText(war.lan.invite ?? "").then((ok) => notify(ok ? t("inviteCopied") : t("inviteCopyFailed"), !ok))}>
+          <div className="invite-box">
+            <input className="invite-code" readOnly value={war.lan.invite} aria-label={t("invite")} onFocus={(e) => e.currentTarget.select()} />
+            <button className="btn" data-tip={t("inviteNewTip")} onClick={() => setLan(true, true, true)}>{t("inviteNew")}</button>
+          </div>
+        </Confirm>
       )}
       {dialog === "end" && (
         <Confirm title={t("endSeason")} text={t("endSeasonText", { n: war.season })} okLabel={t("endSeason")} danger={result === "lost"} onOk={() => run({ action: "end_season", result })} onClose={() => setDialog(null)}>

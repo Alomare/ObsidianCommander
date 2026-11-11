@@ -582,7 +582,7 @@ export const mockApi: Api = {
   action: async (id, a) => { const m = get(id); act(m, a); m.war.server_time = Math.floor(now()); return delay(m.war); },
   feed: async (id, after, limit = 200) => delay(get(id).feed.filter((e) => after == null || e.id > after).slice(-limit)),
   history: async (id, from) => delay(get(id).history.filter((s) => from == null || s.time >= from)),
-  lan: async (id, open, internet) => { const m = get(id); m.war.lan = { open, port: open ? 17494 : null, internet: open && (internet ?? !!m.war.lan.internet) }; return delay(m.war.lan); },
+  lan: async (id, open, internet, newInvite) => { const m = get(id); const on = open && (internet ?? !!m.war.lan.internet); m.war.lan = { open, port: open ? 17494 : null, internet: on, invite: on ? (newInvite ? "W8RX3-HJ6LD" : m.war.lan.invite ?? "K7M2P-9XQ4T") : null }; return delay(m.war.lan); },
   exportWar: async (id) => new Blob([JSON.stringify(get(id), null, 1)], { type: "application/json" }),
   importWar: async (file: any) => {
     ensure();

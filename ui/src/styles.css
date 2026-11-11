@@ -361,6 +361,9 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .lan-text b { font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; color: var(--tx); }
 .lan-text small { font-size: var(--fs-xs); color: var(--mu); font-family: "Saira Variable", sans-serif; white-space: nowrap; }
 .lan-ctl.on .lan-text small { color: var(--go); }
+.btn.invite-btn { font-family: "Saira Variable", sans-serif; letter-spacing: 0.06em; font-size: var(--fs-sm); height: 2.2rem; padding: 0 0.7rem; color: var(--go); }
+.invite-box { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.4rem; }
+.invite-code { flex: 1; min-width: 0; height: 2.4rem; padding: 0 0.7rem; background: var(--well); color: var(--tx); border: 1px solid var(--ln); border-radius: 0; font-family: "Saira Variable", sans-serif; font-size: 1.15rem; letter-spacing: 0.12em; text-align: center; }
 .bar-tools { display: flex; gap: 0.35rem; padding-left: 0.9rem; border-left: 1px solid var(--ln); }
 .play-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
 .btn.play.big { height: 2.7rem; min-width: 9.5rem; font-size: var(--fs-base); clip-path: polygon(0.5rem 0, calc(100% - 0.5rem) 0, 100% 50%, calc(100% - 0.5rem) 100%, 0.5rem 100%, 0 50%); -webkit-mask: none; }
@@ -370,6 +373,8 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .play-note::before { content: ""; display: inline-block; width: 0.38rem; height: 0.38rem; margin-right: 0.3rem; background: var(--gold); transform: rotate(45deg) translateY(-1px); }
 @container bar (max-width: 66rem) {
   .lan-text, .wc-time .cap { display: none; }
+  /* The invite code stays in the menu when the bar is short of room. */
+  .btn.invite-btn { display: none; }
 }
 @container bar (max-width: 54rem) {
   .seg.speed button:nth-child(1), .seg.speed button:nth-child(5) { display: none; }
