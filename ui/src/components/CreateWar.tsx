@@ -17,10 +17,13 @@ const PRESET_IDS: PresetId[] = ["standard", "short", "hard"];
 type Model = "vanilla" | "evolved";
 /** Mock only, for screenshots: `&model=evolved` picks the model, `&adv=1` opens Advanced. */
 const mockQ = new URLSearchParams(isMock ? location.search : "");
+/** Evolved wars are on hold (the user, 2026-11-11): the card shows, disabled. Existing Evolved wars still open
+    and play; the mock keeps the model for screenshots. */
+const EVOLVED_OPEN = isMock && mockQ.get("model") === "evolved";
 
 export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCreated: (id: string) => void }) {
   const [name, setName] = useState("");
-  const [model, setModel] = useState<Model>(mockQ.get("model") === "evolved" ? "evolved" : "vanilla");
+  const [model, setModel] = useState<Model>(EVOLVED_OPEN ? "evolved" : "vanilla");
   const [settings, setSettings] = useState<Settings>(PRESETS.standard);
   const [evo, setEvo] = useState<EvoSettings>(EVO_DEFAULTS);
   const [advanced, setAdvanced] = useState(mockQ.get("adv") === "1");
@@ -64,9 +67,13 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
                 <span className="mc-logo vanilla"><img src={modelLogo("vanilla")} alt="" draggable={false} /></span>
                 <span className="mc-text"><b className="cap">{t("modelVanilla")}</b><small>{t("modelVanillaText")}</small></span>
               </button>
-              <button type="button" role="radio" className={`model-card${model === "evolved" ? " on" : ""}`} aria-checked={model === "evolved"} onClick={() => setModel("evolved")}>
+              <button type="button" role="radio" className={`model-card${model === "evolved" ? " on" : ""}`} aria-checked={model === "evolved"} disabled={!EVOLVED_OPEN}
+                onClick={() => setModel("evolved")}>
                 <span className="mc-logo evolved"><img src={modelLogo("evolved")} alt="" draggable={false} /></span>
-                <span className="mc-text"><b className="cap">{t("modelEvolved")}</b><small>{t("modelEvolvedText")}</small></span>
+                <span className="mc-text">
+                  <b className="cap">{t("modelEvolved")}{!EVOLVED_OPEN && <span className="chip later">{t("comingLater")}</span>}</b>
+                  <small>{t("modelEvolvedText")}</small>
+                </span>
               </button>
             </div>
           </div>

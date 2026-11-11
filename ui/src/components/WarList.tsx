@@ -85,8 +85,7 @@ function WarCard({ war, index, playing, gameRunning, readOnly, onOpen, onEdit }:
   const fronts = evolved ? [] : war.fronts ?? [];
   const model = playModel(war.model);
   const lanOpen = typeof war.lan === "boolean" ? war.lan : !!war.lan?.open;
-  const lanPort = typeof war.lan === "object" && war.lan ? war.lan.port : null;
-  const share = (f: FrontBrief) => f.status === "defeated" ? 1 : f.status === "hidden" ? 0 : f.points != null && f.points_max ? f.points / f.points_max : Math.max(0, (f.region - 1) / 10);
+  const lanPort = typeof war.lan === "object" && war.lan ? war.lan.port : null;  const share = (f: FrontBrief) => f.status === "defeated" ? 1 : f.status === "hidden" ? 0 : f.points != null && f.points_max ? f.points / f.points_max : Math.max(0, (f.region - 1) / 10);
   const busy = gameRunning ? t("gameRunningTip") : undefined;
   return (
     <div className={`war-card${playing ? " playing" : ""}`} style={{ animationDelay: `${index * 50}ms` }} role="button" tabIndex={0} aria-label={t("openWar", { name: war.name })}
@@ -101,7 +100,7 @@ function WarCard({ war, index, playing, gameRunning, readOnly, onOpen, onEdit }:
           {war.model && war.model !== "vanilla" && <span className="chip model">{evolved ? t("modelEvolvedShort") : war.model}</span>}
           {war.season != null && <span className="chip" data-tip={t("seasonTip")}>{t("seasonN", { n: war.season })}</span>}
           {war.state && <span className={`chip state ${war.state}`}>{tk(`state_${war.state}`)}</span>}
-          {lanOpen && <span className="chip lan" data-tip={lanPort ? t("lanOpenTip", { port: lanPort }) : t("lanTip")}><ILan width={13} height={13} />{t("lanOpen")}</span>}
+          {lanOpen && <span className="chip lan" data-tip={lanPort ? t("shareOpenLan", { port: lanPort }) : undefined}><ILan width={13} height={13} />{t("lanOpen")}</span>}
           {members != null && <span className="chip" data-tip={war.players != null ? t("recentPlayers", { n: war.players }) : undefined}><IUsers width={13} height={13} />{members === 1 ? t("memberOne") : t("membersN", { n: members })}</span>}
         </div>
         {fronts.length > 0 && (

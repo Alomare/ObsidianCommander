@@ -5,22 +5,24 @@ import { playModel, selectWar, useHost } from "../bridge";
 import { useNow, useTween, useWarData } from "../hooks";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";
-import { clock, copyText, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
+import { clock, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
 import { evoOf } from "../evolved";
 import { FACTION_ACCENT, GalaxyMap, HELLDIVER_ACCENT, type Selection } from "../map/GalaxyMap";
 import { CommandPanel } from "./CommandPanel";
 import { EvolvedBody } from "./EvolvedView";
 import { EvolvedSettingsDialog } from "./EvolvedSettings";
 import { FeedList, PlayersPanel, SettingsDialog, StatsPanel } from "./Panels";
-import { EnemyIcon, IBack, ICheck, IEdit, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, IGlobe, ILan, IList, IMore, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
-import { Confirm, MenuButton, Seg, Switch, notify } from "./ui";
+import { EnemyIcon, IBack, ICheck, IEdit, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, IGlobe, ILan, IList, IMore, IShare, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
+import { ShareDialog } from "./ShareDialog";
+import { Confirm, MenuButton, Seg, notify } from "./ui";
 import { WarInfoDialog } from "./WarInfo";
 
 type Tab = "command" | "feed" | "players" | "stats";
 const TABS: Tab[] = ["command", "feed", "players", "stats"];
 export type SeasonAsk = "end" | "new";
 
-/** Mock only, for screenshots: `&sel=bugs:4` (or `superearth`) selects a region, `&tab=feed` opens a tab. */
+/** Mock only, for screenshots: `&sel=bugs:4` (or `superearth`) selects a region, `&tab=feed` opens a tab,
+    `&dialog=share` opens Share. */
 const mockStart = (() => {
   const q = new URLSearchParams(location.search);
   const sel = isMock ? q.get("sel") : null;
@@ -32,10 +34,9 @@ const mockStart = (() => {
     if (enemy >= 0) s = r ? { kind: "region", enemy, region: Number(r) } : { kind: "front", enemy };
   }
   const tab = (isMock && TABS.includes(q.get("tab") as Tab) ? q.get("tab") : "command") as Tab;
-  return { sel: s, tab };
+  return { sel: s, tab, share: isMock && q.get("dialog") === "share" };
 })();
 const SPEEDS = [0.5, 1, 2, 5, 10];
-const FIREWALL_SEEN = "commander-lan-note";
 
 export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly: boolean; guest: boolean; onBack: () => void }) {
   const host = useHost();
@@ -43,7 +44,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const now = useNow(1000);
   const [selection, setSelection] = useState<Selection>(mockStart.sel);
   const [tab, setTab] = useState<Tab>(mockStart.tab);
-  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "lan" | "internet" | "invite" | SeasonAsk>(null);
+  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "share" | SeasonAsk>(mockStart.share ? "share" : null);
   const [result, setResult] = useState<"won" | "lost">("won");
 
   /** A Game Master action; true when the server took it. */
@@ -113,13 +114,6 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
       notify(e instanceof Error ? e.message : String(e), true);
     }
   };
-  // Opening to LAN the first time says what Windows is about to ask.
-  const toggleLan = (open: boolean) => {
-    let seen = false;
-    try { seen = localStorage.getItem(FIREWALL_SEEN) === "1"; } catch { /* storage blocked */ }
-    if (open && !seen) setDialog("lan");
-    else setLan(open);
-  };
 
   const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: "command", label: readOnly ? t("overview") : t("command"), icon: readOnly ? <IEye /> : <ICommand /> },
@@ -149,42 +143,25 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
             <span className="chip" data-tip={t("seasonTip")}>{t("seasonN", { n: war.season })}</span>
             <span className={`chip state ${war.state}`}>{tk(`state_${war.state}`)}</span>
             {readOnly && <span className="chip ro" data-tip={t("readOnlyTip")}><IEye width={13} height={13} />{t("readOnly")}</span>}
+            {!readOnly && war.lan.open && (
+              <span className="chip lan" data-tip={t(war.lan.internet ? "shareOpenInternet" : "shareOpenLan", { port: war.lan.port ?? "" })}>
+                {war.lan.internet ? <IGlobe width={13} height={13} /> : <ILan width={13} height={13} />}{war.lan.internet ? t("internetShort") : t("lanShort")}
+              </span>
+            )}
           </div>
         </div>
 
         <WarClock war={war} serverNow={serverNow} readOnly={readOnly} run={run} />
 
         {!readOnly && (
-          <label className={`lan-ctl${war.lan.open ? " on" : ""}`} data-tip-title={t("lan")} data-tip={t("lanTip")}>
-            <ILan />
-            <span className="lan-text">
-              <b>{t("lanShort")}</b>
-              <small>{war.lan.open && war.lan.port ? t("lanPort", { port: war.lan.port }) : t("lanClosed")}</small>
-            </span>
-            <Switch on={war.lan.open} onChange={toggleLan} label={t("lan")} />
-          </label>
-        )}
-        {!readOnly && war.lan.open && (
-          <label className={`lan-ctl${war.lan.internet ? " on" : ""}`} data-tip-title={t("internet")} data-tip={t("internetTip")}>
-            <IGlobe />
-            <span className="lan-text">
-              <b>{t("internetShort")}</b>
-              <small>{war.lan.internet ? t("internetOpen") : t("lanClosed")}</small>
-            </span>
-            {/* Opening always asks: the war then answers anyone who has the address. */}
-            <Switch on={!!war.lan.internet} onChange={(on) => (on ? setDialog("internet") : setLan(true, false))} label={t("internet")} />
-          </label>
-        )}
-        {!readOnly && war.lan.open && war.lan.internet && war.lan.invite && (
-          <button className="btn invite-btn" onClick={() => setDialog("invite")} data-tip-title={t("invite")} data-tip={t("inviteTip")}>{war.lan.invite}</button>
-        )}
-        {!readOnly && (
           <div className="bar-tools">
+            <button className="btn go share-btn" onClick={() => setDialog("share")} aria-label={t("share")} data-tip-title={t("share")} data-tip={t("shareTip")}>
+              <IShare /><span>{t("share")}</span>
+            </button>
             <button className="btn icon" onClick={() => setDialog("settings")} aria-label={t("settings")} data-tip={t("settings")}><IGear /></button>
             <MenuButton label={t("more")} icon={<IMore />} items={[
               { label: t("editInfo"), icon: <IEdit />, run: () => setDialog("info") },
               { label: t("exportWar"), icon: <IExport />, run: exportWar },
-              ...(war.lan.open && war.lan.internet && war.lan.invite ? [{ label: t("invite"), icon: <IGlobe />, run: () => setDialog("invite") }] : []),
               { label: t("deleteWar"), icon: <ITrash />, danger: true, run: () => setDialog("delete") },
             ]} />
           </div>
@@ -244,23 +221,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
         <Confirm title={t("deleteWar")} text={t("deleteWarText", { name: war.name })} okLabel={t("delete")} danger onClose={() => setDialog(null)}
           onOk={async () => { try { await api.deleteWar(war.id); onBack(); } catch (e) { notify(e instanceof Error ? e.message : String(e), true); } }} />
       )}
-      {dialog === "lan" && (
-        <Confirm title={t("lan")} text={t("lanFirewall")} okLabel={t("lan")} onClose={() => setDialog(null)}
-          onOk={() => { try { localStorage.setItem(FIREWALL_SEEN, "1"); } catch { /* storage blocked */ } setLan(true); }} />
-      )}
-      {dialog === "internet" && (
-        <Confirm title={t("internet")} text={t("internetText", { port: war.lan.port ?? 17494 })} okLabel={t("internet")} onClose={() => setDialog(null)}
-          onOk={() => setLan(true, true)} />
-      )}
-      {dialog === "invite" && war.lan.invite && (
-        <Confirm title={t("invite")} text={t("inviteText", { port: war.lan.port ?? 17494 })} okLabel={t("inviteCopy")} onClose={() => setDialog(null)}
-          onOk={() => copyText(war.lan.invite ?? "").then((ok) => notify(ok ? t("inviteCopied") : t("inviteCopyFailed"), !ok))}>
-          <div className="invite-box">
-            <input className="invite-code" readOnly value={war.lan.invite} aria-label={t("invite")} onFocus={(e) => e.currentTarget.select()} />
-            <button className="btn" data-tip={t("inviteNewTip")} onClick={() => setLan(true, true, true)}>{t("inviteNew")}</button>
-          </div>
-        </Confirm>
-      )}
+      {dialog === "share" && <ShareDialog war={war} setLan={setLan} onClose={() => setDialog(null)} />}
       {dialog === "end" && (
         <Confirm title={t("endSeason")} text={t("endSeasonText", { n: war.season })} okLabel={t("endSeason")} danger={result === "lost"} onOk={() => run({ action: "end_season", result })} onClose={() => setDialog(null)}>
           <Seg value={result} onChange={setResult} options={[{ v: "won", label: t("endWon") }, { v: "lost", label: t("endLost") }]} />

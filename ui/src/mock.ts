@@ -490,7 +490,10 @@ function seedWars() {
   const b = newWar("LAN Night", { ...s, points_max: 30000, start_points: 3000, pressure_per_hour: 300 }, "p7m2wd");
   b.war.state = "paused";
   b.war.season = 1;
-  b.war.lan = { open: true, port: 17494 };
+  // `&internet=1`: this war is open to the internet too, for screenshots of Share.
+  b.war.lan = new URLSearchParams(location.search).get("internet") === "1"
+    ? { open: true, port: 17494, internet: true, invite: "K7M2P-9XQ4T" }
+    : { open: true, port: 17494 };
   b.war.fronts[2].status = "hidden";
   setPoints(b, b.war.fronts[0], 21000, null);
   setPoints(b, b.war.fronts[1], 9000, null);

@@ -312,6 +312,7 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .mc-soon { flex: none; width: 4.2rem; height: 4.2rem; display: grid; place-items: center; text-align: center; font-size: var(--fs-xs); line-height: 1.3; color: var(--mu); border: 1px dashed var(--ln); }
 .mc-text { display: flex; flex-direction: column; gap: 0.3rem; }
 .mc-text b { font-size: var(--fs-md); }
+.mc-text .chip.later { margin-left: 0.5rem; vertical-align: 0.1em; text-transform: none; }
 .mc-text small, .preset-card small { font-size: var(--fs-sm); color: var(--mu); line-height: 1.4; }
 .preset-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
 .preset-card { flex-direction: column; align-items: stretch; gap: 0.35rem; }
@@ -353,15 +354,24 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .seg.speed button { height: 2.4rem; padding: 0 0.55rem; font-family: "Saira Variable", sans-serif; font-variant-numeric: tabular-nums; }
 .speed-read { font-family: "Saira Variable", sans-serif; color: var(--mu); }
 .clock-btn.paused { color: var(--goldtx); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent); }
-.lan-ctl { display: flex; align-items: center; gap: 0.55rem; padding-left: 0.9rem; border-left: 1px solid var(--ln); height: 2.4rem; cursor: pointer; color: var(--mu); }
-.lan-ctl > svg { flex: none; transition: color var(--fast); }
-.lan-ctl.on > svg { color: var(--go); }
-.lan-ctl:hover > svg { color: var(--tx); }
-.lan-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 3.6rem; }
-.lan-text b { font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; color: var(--tx); }
-.lan-text small { font-size: var(--fs-xs); color: var(--mu); font-family: "Saira Variable", sans-serif; white-space: nowrap; }
-.lan-ctl.on .lan-text small { color: var(--go); }
-.btn.invite-btn { font-family: "Saira Variable", sans-serif; letter-spacing: 0.06em; font-size: var(--fs-sm); height: 2.2rem; padding: 0 0.7rem; color: var(--go); }
+.btn.share-btn { gap: 0.45rem; padding: 0 0.85rem; }
+.share-dialog { width: min(36rem, calc(100vw - 2rem)); }
+.share-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.8rem; align-items: start; padding: 0.8rem 0; border-bottom: 1px solid var(--ln); }
+.share-row:first-child { padding-top: 0.2rem; }
+.share-row > svg { margin-top: 0.1rem; color: var(--mu); transition: color var(--fast); }
+.share-row.on > svg { color: var(--go); }
+.share-row > .sw { margin-top: 0.1rem; }
+.share-name { display: flex; align-items: baseline; gap: 0.6rem; }
+.share-name b { font-size: var(--fs-md); font-weight: 650; }
+.share-name small { font-size: var(--fs-xs); color: var(--mu); font-family: "Saira Variable", sans-serif; letter-spacing: 0.04em; }
+.share-row.on .share-name small { color: var(--go); }
+.share-text p { margin: 0.3rem 0 0; font-size: var(--fs-sm); color: var(--mu); line-height: 1.45; }
+.share-ask { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.7rem; margin-top: 0.8rem; padding: 0.75rem 0.85rem; background: color-mix(in srgb, var(--gold) 9%, transparent); box-shadow: inset 3px 0 0 var(--gold); }
+.share-ask > svg { color: var(--goldtx); }
+.share-ask p { margin: 0 0 0.65rem; font-size: var(--fs-sm); line-height: 1.45; }
+.share-invite { margin-top: 0.9rem; }
+.share-invite p { margin: 0.5rem 0 0; line-height: 1.45; }
+.share-note { margin: 0.9rem 0 0; line-height: 1.45; }
 .invite-box { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.4rem; }
 .invite-code { flex: 1; min-width: 0; height: 2.4rem; padding: 0 0.7rem; background: var(--well); color: var(--tx); border: 1px solid var(--ln); border-radius: 0; font-family: "Saira Variable", sans-serif; font-size: 1.15rem; letter-spacing: 0.12em; text-align: center; }
 .bar-tools { display: flex; gap: 0.35rem; padding-left: 0.9rem; border-left: 1px solid var(--ln); }
@@ -372,9 +382,10 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .play-note { position: absolute; top: calc(100% + 0.1rem); font-size: var(--fs-xs); color: var(--goldtx); white-space: nowrap; letter-spacing: 0.04em; }
 .play-note::before { content: ""; display: inline-block; width: 0.38rem; height: 0.38rem; margin-right: 0.3rem; background: var(--gold); transform: rotate(45deg) translateY(-1px); }
 @container bar (max-width: 66rem) {
-  .lan-text, .wc-time .cap { display: none; }
-  /* The invite code stays in the menu when the bar is short of room. */
-  .btn.invite-btn { display: none; }
+  .wc-time .cap { display: none; }
+  /* Short of room, Share keeps the icon. */
+  .btn.share-btn { width: 2.4rem; padding: 0; }
+  .btn.share-btn span { display: none; }
 }
 @container bar (max-width: 54rem) {
   .seg.speed button:nth-child(1), .seg.speed button:nth-child(5) { display: none; }
