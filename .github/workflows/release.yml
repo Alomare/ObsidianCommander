@@ -1,0 +1,80 @@
+# A release: pushing a tag like v0.5.0 on main builds the war server and the war screens, packs
+# obsidian-commander-<version>.zip, signs it and publishes both with the notes in
+# docs/releases/<version>.md. Obsidian installs a downloaded package only with that signature.
+#
+# The rules for a release:
+# - The tag matches the version in server/Cargo.toml and ui/package.json.
+# - docs/releases/<version>.md exists.
+# - The server tests pass.
+#
+# Needs two repository secrets, the same two the Obsidian Launcher release uses (Settings, Secrets and
+# variables, Actions): TAURI_SIGNING_PRIVATE_KEY, the content of the updater key file, and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD, the password that opens it. Without them the run stops before
+# anything is built. A tag with a suffix (v0.5.0-beta.1) makes a prerelease, which Obsidian does not
+# offer.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The tag matches the version, the notes exist and the signing key is set
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          grep -q "^version = \"$v\"" server/Cargo.toml || { echo "::error::server/Cargo.toml does not say $v"; exit 1; }
+          grep -q "\"version\": \"$v\"" ui/package.json || { echo "::error::ui/package.json does not say $v"; exit 1; }
+          [ -s "docs/releases/$v.md" ] || { echo "::error::docs/releases/$v.md is missing"; exit 1; }
+          [ -n "$KEY" ] || { echo "::error::Add the repository secrets TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD first."; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Server tests
+        working-directory: server
+        run: cargo test
+
+      - name: Pack
+        run: |
+          (cd ui && npm ci)
+          python tools/pack.py
+
+      # The signer is the Tauri CLI, as for the Obsidian updates. It reads the key and the password
+      # from the environment and writes <zip>.sig beside the ZIP.
+      - name: Sign, and check the signature as Obsidian does
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          zip="internal/builds/obsidian-commander-$VERSION.zip"
+          npx --yes @tauri-apps/cli@2.12.1 signer sign "$zip" > /dev/null
+          [ -s "$zip.sig" ] || { echo "::error::no signature was written"; exit 1; }
+          python -m pip install -q pynacl
+          python tools/verify_sig.py "$zip"
+
+      - name: Publish
+        run: |
+          zip="internal/builds/obsidian-commander-$VERSION.zip"
+          pre=""
+          [[ "$GITHUB_REF_NAME" == *-* ]] && pre="--prerelease"
+          gh release create "$GITHUB_REF_NAME" "$zip.sig" "$zip" --title "Obsidian Commander $VERSION" --notes-file "docs/releases/$VERSION.md" $pre
