@@ -111,7 +111,8 @@ def main():
         code, war = admin(base, "POST", "/api/wars", {"name": "E2E Offensive", "model": "vanilla"})
         check("create war", code in (200, 201) and bool(war.get("id")), f"{code} {str(war)[:160]}")
         wid = war["id"]
-        season = war["season"]
+        # The game sends the game season; `season` in the admin view is the one people see, counted from 1.
+        season = war.get("game_season", war["season"])
 
         # 1. The game requests.
         code, st = game(base, wid, {"action": "get_campaign_status"})
