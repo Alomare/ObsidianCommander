@@ -142,7 +142,7 @@ def play():
         relay_url = war_line.split("\t")[2]
         # The probe mod drives the game; the URL is the relay URL, the same the loader sets.
         CFG.write_text(f"url={relay_url}\nisolate_save=0\nblock_telemetry=0\nno_tutorial=1\n")
-        log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:900", f"wait:POLL season={war['season']}:240", "sleep:5", "cmd:state", "shot:ship")
+        log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:900", f"wait:POLL season={war.get('game_season', war['season'])}:240", "sleep:5", "cmd:state", "shot:ship")
         if "TIMEOUT" in log or "GAME GONE" in log:
             print("stopped early")
             return
@@ -212,7 +212,7 @@ def play_evolved(out, base, token, wid, war):
     if not war_line:
         sys.exit("no war line in settings.txt")
     CFG.write_text(f"url={war_line.split(chr(9))[2]}\nisolate_save=0\nblock_telemetry=0\nno_tutorial=1\n")
-    log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:300", f"wait:POLL season={war['season']}:240", "sleep:12", "cmd:state", "shot:ship")
+    log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:300", f"wait:POLL season={war.get('game_season', war['season'])}:240", "sleep:12", "cmd:state", "shot:ship")
     if "TIMEOUT" in log or "GAME GONE" in log:
         drive(out, "shot:stuck")
         print("stopped early")
