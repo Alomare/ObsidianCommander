@@ -326,6 +326,23 @@ function COMMANDS.http(rest)
 	return "sent " .. #body .. " bytes to " .. BASE .. "/commander/report"
 end
 
+-- A2. One request with a given method (2026-11-11, Evolved war): `httpm <METHOD> <url>`. POST goes
+-- with a JSON body, as the game sends; the answer code and the start of the body go to the log.
+function COMMANDS.httpm(rest)
+	local method, url = string.match(rest or "", "^(%S+)%s+(%S+)$")
+	if not method then return "usage: httpm <METHOD> <url>" end
+	local req = g("Http").create_request(method, url, function(_, code, body)
+		log("HTTPM " .. method .. " " .. url .. " -> " .. tostring(code) .. " " .. string.sub(tostring(body), 1, 100))
+	end)
+	if not req then return "no request for " .. method end
+	if method == "POST" then
+		req:add_header("Content-Type", "application/json")
+		req:set_body("{}")
+	end
+	req:send()
+	return "sent " .. method .. " " .. url
+end
+
 -- B. Custom persistent planets. Takes the rolled planets of a front, renames the first three to
 -- invented keys with custom words, marks them scanned, and keeps copies; a post-hook on
 -- generate_planets puts the copies back after every reroll.

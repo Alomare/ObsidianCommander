@@ -13,14 +13,20 @@ play   starts `obsidian commander serve`, creates a war through the admin API, s
 end    back to the official war, purge, the real library redeployed if it was, the real saves compared.
 
 Output: probe/runs/war-<time>/ with the logs, the server war JSON and the screenshots.
+
+--evolved: an Evolved war with the newest Evolved War Engine build (Mods/EvolvedWarEngine/internal/builds)
+in the library. Before the launch the relay is asked for evolved/state as the mod asks it; in the game
+the galaxy map screen is opened and shot, and the mod log is kept.
 """
 import argparse
 import hashlib
+import http.server
 import json
 import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -36,6 +42,8 @@ CFG = LOGS / "cmdprobe.cfg"
 SAVES = [Path(os.environ["APPDATA"]) / "Arrowhead/Helldivers/saves", Path(r"C:\Program Files (x86)\Steam\userdata")]
 OBS = None
 OBS_REPO = None
+EVOLVED = False
+EVO_BUILDS = REPO.parent.parent / "Mods" / "EvolvedWarEngine" / "internal" / "builds"
 
 
 def obs(*args, real=False, check=False):
@@ -74,7 +82,13 @@ def begin():
     (STATE / "real-was-deployed.txt").write_text("no" if "the game is vanilla" in st else "yes")
     obs("purge", real=True)
     shutil.copytree(OBS_REPO / "loader" / "src", OBS.parent / "loader" / "src", dirs_exist_ok=True)
-    for folder, mod in ((KIT / "ObsidianAPI", "obsidian.api"), (KIT / "ObsidianPatches", "obsidian.qol"), (HERE / "mod", "obsidian.cmdprobe")):
+    mods = [(KIT / "ObsidianAPI", "obsidian.api"), (KIT / "ObsidianPatches", "obsidian.qol"), (HERE / "mod", "obsidian.cmdprobe")]
+    if EVOLVED:
+        zips = sorted(EVO_BUILDS.glob("alomare.evolvedwar-*.zip"), key=lambda p: p.stat().st_mtime)
+        if not zips:
+            sys.exit("no Evolved War Engine build: run Mods/pack_build.py")
+        mods.append((zips[-1], "alomare.evolvedwar"))
+    for folder, mod in mods:
         obs("import", folder)
         obs("enable", mod)
     for option in ("skip_intro", "skip_login", "skip_war_briefs", "skip_planet_scanning"):
@@ -112,10 +126,12 @@ def play():
         base, token = url.split("/?token=")
         relay_line = serve.stdout.readline().strip()
         print(relay_line)
-        war = admin(base, token, "POST", "/api/wars", {"name": "Probe War", "model": "vanilla"})
+        war = admin(base, token, "POST", "/api/wars", {"name": "Probe War", "model": "evolved" if EVOLVED else "vanilla"})
         wid = war["id"]
-        print("war", wid, "season", war["season"], [f["points"] for f in war["fronts"]])
+        print("war", wid, "season", war["season"], "model", war.get("model"), [f["points"] for f in war["fronts"]])
         obs("commander", "play", wid, "--name", "Probe War", check=True)
+        if EVOLVED:
+            return play_evolved(out, base, token, wid, war)
         obs("deploy")
         settings = (GAME_SIDE / "settings.txt").read_text()
         war_line = next((l for l in settings.splitlines() if l.startswith("war\t")), None)
@@ -155,7 +171,7 @@ def play():
             CFG.unlink()
         except OSError:
             pass
-        for name in ("cmdprobe.log", "loader.log"):
+        for name in ("cmdprobe.log", "loader.log", "alomareevolvedwar.log"):
             if (LOGS / name).exists():
                 shutil.copy2(LOGS / name, out / name)
         names = GAME_SIDE / "commander-names.txt"
@@ -168,6 +184,67 @@ def play():
         except Exception:
             serve.kill()
         print("run folder:", out)
+
+
+def http_get(url):
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            return r.status, r.read()[:240]
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()[:240]
+    except Exception as e:  # noqa: BLE001 - any failure is a finding here
+        return None, str(e).encode()
+
+
+def play_evolved(out, base, token, wid, war):
+    """The Evolved war: the relay asked as the mod asks it, then the galaxy map screen in the game."""
+    time.sleep(1.5)  # `serve` takes the new route from the state file every half second
+    st = json.loads((DATA / "commander" / "state.json").read_text())
+    relay = f"http://127.0.0.1:{st['relayPort']}/{st['token']}/"
+    for name, url in (("server", f"{base}/w/{wid}/evolved/state"), ("relay", relay + "evolved/state"), ("relay war api", relay + "1.0/")):
+        code, body = http_get(url)
+        print(f"{name}: {code} {body[:160]!r}")
+    obs("deploy")
+    settings = (GAME_SIDE / "settings.txt").read_text()
+    war_line = next((l for l in settings.splitlines() if l.startswith("war\t")), None)
+    print("settings war line:", war_line)
+    if not war_line:
+        sys.exit("no war line in settings.txt")
+    CFG.write_text(f"url={war_line.split(chr(9))[2]}\nisolate_save=0\nblock_telemetry=0\nno_tutorial=1\n")
+    log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:900", f"wait:POLL season={war['season']}:240", "sleep:12", "cmd:state", "shot:ship")
+    if "TIMEOUT" in log or "GAME GONE" in log:
+        print("stopped early")
+        return
+    # What the game's Http sends for each method: a listener on this PC keeps method, path and body size.
+    seen = []
+
+    class Listener(http.server.BaseHTTPRequestHandler):
+        def answer(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(n) if n else b""
+            seen.append(f"{self.command} {self.path} body={len(body)}")
+            reply = f"ok-{self.command}".encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(reply)))
+            self.end_headers()
+            self.wfile.write(reply)
+
+        do_GET = do_POST = answer
+
+        def log_message(self, *args):
+            pass
+
+    listener = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Listener)
+    threading.Thread(target=listener.serve_forever, daemon=True).start()
+    lp = listener.server_address[1]
+    relay_game = war_line.split(chr(9))[2][: -len("1.0/")]
+    drive(out, f"cmd:httpm GET http://127.0.0.1:{lp}/probe-get", "sleep:3", f"cmd:httpm POST http://127.0.0.1:{lp}/probe-post", "sleep:3",
+          f"cmd:httpm GET {relay_game}evolved/state", "sleep:3", f"cmd:httpm POST {relay_game}evolved/state", "sleep:3")
+    print("listener saw:", seen)
+    listener.shutdown()
+    drive(out, "cmd:menu campaign", "sleep:12", "shot:evolved-map", "sleep:4", "shot:evolved-map-later", "cmd:close", "sleep:3")
+    final = admin(base, token, "GET", f"/api/wars/{wid}")
+    (out / "war.json").write_text(json.dumps(final, indent=1))
 
 
 def end():
@@ -196,21 +273,26 @@ def end():
 
 
 def main():
-    global OBS, OBS_REPO
+    global OBS, OBS_REPO, EVOLVED
     ap = argparse.ArgumentParser()
     ap.add_argument("verb", choices=("all", "begin", "play", "end"))
     ap.add_argument("--obsidian", required=True)
+    ap.add_argument("--evolved", action="store_true")
     a = ap.parse_args()
+    EVOLVED = a.evolved
     OBS_REPO = Path(a.obsidian)
     OBS = OBS_REPO / "target" / "debug" / "obsidian.exe"
     if not OBS.exists():
         sys.exit(f"no {OBS}")
     if a.verb in ("all", "begin"):
         begin()
-    if a.verb in ("all", "play"):
-        play()
-    if a.verb in ("all", "end"):
-        end()
+    try:
+        if a.verb in ("all", "play"):
+            play()
+    finally:
+        # The real library comes back even when the play step fails.
+        if a.verb in ("all", "end"):
+            end()
 
 
 if __name__ == "__main__":
