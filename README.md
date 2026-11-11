@@ -14,7 +14,7 @@ Two kinds of war, local or over LAN:
 | [server/](server/) | `commander-server`, in Rust. Holds the wars, answers the war API the game calls, runs the Vanilla rules, serves the admin API and the war screens, and runs the LAN listener and announcements |
 | [ui/](ui/) | The war screens (Vite, React, TypeScript): war list, **Create War**, the galaxy map drawn from the in-game map, Game Master commands, feed, players, and statistics with the front progress chart. `npm run dev` with `?mock=1` runs them against a fake server |
 | [data/warfront.json](data/warfront.json) | The in-game war map: regions as cells on a polar grid, and the map colours |
-| [data/galaxy-hd2.json](data/galaxy-hd2.json) | The Evolved war map: the HELLDIVERS 2 galaxy layout, built by [tools/build_galaxy.py](tools/build_galaxy.py) |
+| [data/galaxy-hd2.json](data/galaxy-hd2.json) | The Evolved war map: the HELLDIVERS 2 galaxy layout and sector outlines (traced by [HELLDIVERS 2 War History Central](https://github.com/crosswaveomega/helldiversplanettable)), built by [tools/build_galaxy.py](tools/build_galaxy.py) |
 | [tools/pack.py](tools/pack.py) | Builds the package ZIP that Obsidian installs, in `internal/builds/` |
 | [tools/e2e.py](tools/e2e.py) | Checks a package end to end without the game: server, game requests, the Obsidian relay, GM actions, LAN and screenshots |
 | [probe/](probe/) | The in-game probes of 2026-11-04 and 2026-11-09 |

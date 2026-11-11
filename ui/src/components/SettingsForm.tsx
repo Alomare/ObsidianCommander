@@ -4,7 +4,7 @@ import { FIELDS, fromShown, toShown, type Field } from "../settings";
 import { t, tk, type StringKey } from "../strings";
 import type { Settings } from "../types";
 import { num } from "../util";
-import { NumberField, Switch } from "./ui";
+import { NumberField, Range, Switch } from "./ui";
 
 function unit(f: Field): string {
   if (f.kind === "chance") return t("percentPerHour");
@@ -38,7 +38,7 @@ export function SettingsForm({ value, onChange }: { value: Settings; onChange: (
                   {f.kind === "bool"
                     ? <Switch on={!!value[f.key]} onChange={(v) => set(f, v ? 1 : 0)} label={tk(`set_${f.key}`)} />
                     : <>
-                      <input type="range" min={f.min} max={max} step={f.step} value={Math.min(max, shown)} onChange={(e) => set(f, Number(e.target.value))} aria-label={tk(`set_${f.key}`)} disabled={off} />
+                      <Range min={f.min} max={max} step={f.step} value={Math.min(max, shown)} onChange={(v) => set(f, v)} label={tk(`set_${f.key}`)} disabled={off} />
                       <NumberField value={shown} min={f.min} max={max} step={f.step} onChange={(v) => set(f, v)} suffix={unit(f)} />
                     </>}
                 </div>

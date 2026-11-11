@@ -1,11 +1,11 @@
-// The Evolved war map: the HELLDIVERS 2 galaxy, planet territories coloured by owner, sector borders,
-// supply lines, campaigns and the Major Order targets.
+// The Evolved war map: the HELLDIVERS 2 galaxy, the sectors tinted by who holds them, supply lines,
+// planets coloured by owner, campaigns and the Major Order targets. Only the planets take clicks.
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from "react";
 import type { EvoCampaign, Evolved, War } from "../types";
 import { t } from "../strings";
 import { clock, enemySingle } from "../util";
 import { activeOrders, ownerName, pctText, secondsLeft } from "../evolved";
-import { BORDER_PATH, LINKS, NEIGHBOURS, OWNER_KEYS, PLANETS, RIM, SECTORS, SHARED_EDGES, ownerColor } from "./galaxy";
+import { BORDER_PATH, EDGE_PATH, LINKS, NEIGHBOURS, OWNER_KEYS, PLANETS, RIM, SECTORS, SECTOR_EDGES, ownerColor, sectorHolder } from "./galaxy";
 
 const PAD_X = 125, PAD_Y = 22;
 const FULL = { x: -RIM - PAD_X, y: -RIM - PAD_Y, w: (RIM + PAD_X) * 2, h: (RIM + PAD_Y) * 2 };
@@ -113,7 +113,7 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
     else onSelect(selected === id ? null : id);
   };
 
-  // The territories, borders, supply lines and planets change only with the owners and the zoom.
+  // The sectors, borders, supply lines and planets change only with the owners and the zoom.
   const territory = useMemo(() => {
     const own = ownersKey.split("").map(Number);
     const sameLinks: string[] = ["", "", "", ""];
@@ -124,26 +124,32 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
       if (own[a] === own[b]) sameLinks[own[a]] += seg;
       else crossLinks += seg;
     }
+    const holders = SECTORS.map((s) => sectorHolder(own, s));
     let front = "";
-    for (const e of SHARED_EDGES) if (e.planets.some((p) => own[p] !== own[e.planets[0]])) front += e.d;
+    for (const e of SECTOR_EDGES) if (holders[e.a].owner !== holders[e.b].owner) front += e.d;
     return (
       <g className="evo-territory">
-        {PLANETS.map((p) => (
-          <path key={p.id} data-planet={p.id} d={p.cell} className={`evo-cell o${own[p.id]}`} style={{ fill: ownerColor(own[p.id], own[p.id] === 0 ? 0.08 : 0.2) }} />
-        ))}
+        {SECTORS.map((s) => {
+          const h = holders[s.id];
+          return <path key={s.id} d={s.path} className="evo-sector" style={{ fill: ownerColor(h.owner, h.owner === 0 ? 0.05 : 0.07 + 0.18 * h.share) }} />;
+        })}
         <path className="evo-sector-borders" d={BORDER_PATH} />
+        <path className="evo-galaxy-edge" d={EDGE_PATH} />
         <path className="evo-front-lines" d={front} />
         {sameLinks.map((d, o) => d && <path key={o} className="evo-links" d={d} style={{ stroke: ownerColor(o, o === 0 ? 0.3 : 0.42) }} />)}
         <path className="evo-links cross" d={crossLinks} />
         <g className="evo-dots">
           {PLANETS.map((p) => p.id !== 0 && (
-            <circle key={p.id} cx={p.x} cy={p.y} r={p.home ? dotR * 1.8 : dotR} className={p.home ? "home" : undefined}
-              style={{ fill: ownerColor(own[p.id], 1), stroke: p.home ? ownerColor(own[p.id], 0.5) : undefined }} />
+            <g key={p.id} className="evo-planet" data-planet={p.id}>
+              <circle cx={p.x} cy={p.y} r={Math.max(dotR * 2.2, 7 / ppu)} className="evo-hit" />
+              <circle cx={p.x} cy={p.y} r={p.home ? dotR * 1.8 : dotR} className={`evo-dot${p.home ? " home" : ""}`}
+                style={{ fill: ownerColor(own[p.id], 1), stroke: p.home ? ownerColor(own[p.id], 0.5) : undefined }} />
+            </g>
           ))}
         </g>
       </g>
     );
-  }, [ownersKey, dotR]);
+  }, [ownersKey, dotR, ppu]);
 
   const counts = useMemo(() => {
     const c = [0, 0, 0, 0];
@@ -174,7 +180,7 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
             <stop offset="100%" stopColor="rgba(120, 180, 255, 0)" />
           </radialGradient>
           <radialGradient id="evo-haze">
-            <stop offset="0%" stopColor="rgba(255, 170, 20, 0.07)" />
+            <stop offset="0%" stopColor="rgba(70, 160, 255, 0.08)" />
             <stop offset="70%" stopColor="rgba(80, 100, 160, 0.05)" />
             <stop offset="100%" stopColor="rgba(80, 100, 160, 0.02)" />
           </radialGradient>
@@ -196,11 +202,9 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
         {/* The planets of the order being written, and the selected planet. */}
         {picks && (
           <g className="evo-picks" aria-hidden>
-            {picks.map((id) => <path key={id} d={PLANETS[id].cell} />)}
-            {picks.map((id) => <circle key={`r${id}`} cx={PLANETS[id].x} cy={PLANETS[id].y} r={dotR * 2.6} />)}
+            {picks.map((id) => <circle key={id} cx={PLANETS[id].x} cy={PLANETS[id].y} r={dotR * 2.6} />)}
           </g>
         )}
-        {sel && sel.id !== 0 && <path className="evo-sel-cell" d={sel.cell} />}
 
         {/* Home worlds */}
         <g className="evo-homes" aria-hidden>

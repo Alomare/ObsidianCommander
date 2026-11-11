@@ -39,13 +39,15 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
     }
   };
 
+  // The form scrolls by itself; the buttons stay in a row under it, so nothing passes beneath them.
   return (
+    <div className="create-shell">
     <div className="page create-page">
       <header className="create-head">
         <button className="btn icon" onClick={onCancel} aria-label={t("back")} data-tip={t("back")}><IBack /></button>
         <h1 className="cap">{t("createTitle")}</h1>
       </header>
-      <form className="create-body" onSubmit={(e) => { e.preventDefault(); if (!busy) create(); }}>
+      <form id="create-war" className="create-body" onSubmit={(e) => { e.preventDefault(); if (!busy) create(); }}>
         <section className="panel create-main">
           <label className="field">
             <span className="field-label">{t("warName")}</span>
@@ -90,11 +92,14 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
           </button>
           {advanced && (model === "evolved" ? <EvolvedSettingsForm value={evo} onChange={setEvo} /> : <SettingsForm value={settings} onChange={setSettings} />)}
         </section>
-        <footer className="create-foot">
-          <button type="button" className="btn" onClick={onCancel}>{t("cancel")}</button>
-          <button type="submit" className="btn play" disabled={busy}><IPlus />{busy ? t("creating") : t("create")}</button>
-        </footer>
       </form>
+    </div>
+    <footer className="create-foot">
+      <div className="create-foot-row">
+        <button type="button" className="btn" onClick={onCancel}>{t("cancel")}</button>
+        <button type="submit" form="create-war" className="btn play" disabled={busy}><IPlus />{busy ? t("creating") : t("create")}</button>
+      </div>
+    </footer>
     </div>
   );
 }

@@ -4,15 +4,17 @@ An Evolved war is a HELLDIVERS 2-style Galactic War played in HELLDIVERS (2015):
 
 ## The map
 
-`data/galaxy-hd2.json`, built by `tools/build_galaxy.py` from the HELLDIVERS 2 planet list (names, positions, sectors and supply lines, read once from the community API at helldivers2.dev):
+`data/galaxy-hd2.json` (version 2), built by `tools/build_galaxy.py` from the HELLDIVERS 2 planet list (names, positions, sectors and supply lines, read once from the community API at helldivers2.dev) and the HELLDIVERS 2 sector outlines, traced from the game map by the [HELLDIVERS 2 War History Central](https://github.com/crosswaveomega/helldiversplanettable) project:
 
 | Field | What it holds |
 |---|---|
-| `planets[]` | `id` (0-272, the number every part uses), `hd2` (the HELLDIVERS 2 index), `name`, `sector`, `x`, `y` (Super Earth at 0, 0, y up, radius about 0.95), `biome`, `env` (HELLDIVERS environment: 0 desert, 1 forest, 2 snow, 3 lava, 4 city), `hazards`, `owner` at the start, `cell` (the convex Voronoi cell of the planet inside the galaxy rim) |
-| `sectors[]` | `id`, `name`, `x`, `y` (the mean of the planets), `owner` at the start, `planets` |
+| `planets[]` | `id` (0-272, the number every part uses), `hd2` (the HELLDIVERS 2 index), `name`, `sector`, `x`, `y` (Super Earth at 0, 0, y up, radius about 0.95), `biome`, `env` (HELLDIVERS environment: 0 desert, 1 forest, 2 snow, 3 lava, 4 city), `hazards`, `owner` at the start |
+| `sectors[]` | `id`, `name`, `x`, `y` (the mean of the planets), `owner` at the start, `planets`, `shape` (the outline, a flat `[x1, y1, x2, y2, ...]` list, counter-clockwise) and `pieces` (the same area cut into convex polygons, for a game gui that fills only triangle fans) |
 | `links` | Supply lines, as pairs of planet ids. Every planet is reachable from Super Earth: planets the source left unlinked join the nearest group |
-| `borders` | Sector border edges: `[x1, y1, x2, y2, sector_a, sector_b]` |
+| `borders` | Every sector edge once: `[x1, y1, x2, y2, sector, other]`, `other` -1 on the outer edge of the galaxy |
 | `homes` | The home world of each enemy |
+
+Three planets sit just outside the outline of their own sector (Meridia, Sangis, Alderidge Cove): the outlines are traced by hand, and the sector of each planet comes from the game.
 
 Factions: 0 Super Earth, 1 bugs, 2 cyborgs, 3 illuminates (the HELLDIVERS enemy index is faction minus 1). At the start the Cyborgs hold the left of the galaxy, the Bugs the right and the Illuminates the bottom; sectors past radius 0.56 in each wedge start enemy-held.
 

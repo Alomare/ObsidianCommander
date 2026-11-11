@@ -3,9 +3,10 @@
 // within a radius of about 0.95; here they become SVG units (MAP_SCALE per map unit), y down.
 
 import raw from "./galaxy-hd2.json";
+import { SIDES, sideColor } from "../palette";
 
-interface RawPlanet { id: number; name: string; sector: number; x: number; y: number; biome: string; env: number; hazards: string[] | null; owner: number; cell: number[] }
-interface RawSector { id: number; name: string; x: number; y: number; owner: number; planets: number[] }
+interface RawPlanet { id: number; name: string; sector: number; x: number; y: number; biome: string; env: number; hazards: string[] | null; owner: number }
+interface RawSector { id: number; name: string; x: number; y: number; owner: number; planets: number[]; shape: number[] }
 interface RawGalaxy {
   galaxy: string; version: number; rim: number; homes: Record<string, number>;
   sectors: RawSector[]; planets: RawPlanet[]; links: [number, number][]; borders: number[][];
@@ -22,10 +23,9 @@ export const GALAXY_VERSION = g.version;
 /** The edge of the galaxy, in SVG units. */
 export const RIM = g.rim * MAP_SCALE;
 
-/** Owner keys and colours: the HELLDIVERS (2015) campaign colours. Index = owner. */
-export const OWNER_KEYS = ["superearth", "bugs", "cyborgs", "illuminates"] as const;
-const OWNER_RGB = ["255, 170, 20", "70, 220, 160", "230, 80, 70", "40, 150, 250"];
-export const ownerColor = (owner: number, alpha = 1) => `rgba(${OWNER_RGB[owner] ?? OWNER_RGB[0]}, ${alpha})`;
+/** Owner keys and colours (src/palette.ts). Index = owner. */
+export const OWNER_KEYS = SIDES;
+export const ownerColor = (owner: number, alpha = 1) => sideColor(SIDES[owner] ?? "superearth", alpha);
 
 export interface GPlanet {
   id: number;
@@ -38,8 +38,6 @@ export interface GPlanet {
   hazards: string[];
   /** The owner at the start of a war. */
   start: number;
-  /** The planet territory, an SVG path. */
-  cell: string;
   /** The enemy (1 to 3) whose home world this is; 0 for any other planet. */
   home: number;
 }
@@ -50,21 +48,25 @@ export interface GSector {
   x: number;
   y: number;
   planets: number[];
+  /** The sector outline as the HELLDIVERS 2 map draws it, an SVG path. */
+  path: string;
 }
 
 const homeOf = new Map<number, number>();
 OWNER_KEYS.forEach((k, i) => { if (i > 0 && g.homes[k] != null) homeOf.set(g.homes[k], i); });
 
-export const PLANETS: GPlanet[] = g.planets.map((p) => {
-  let cell = "";
-  for (let i = 0; i < p.cell.length; i += 2) cell += `${i ? "L" : "M"}${sx(p.cell[i])} ${sy(p.cell[i + 1])}`;
-  return {
-    id: p.id, name: p.name, sector: p.sector, x: sx(p.x), y: sy(p.y), biome: p.biome, env: p.env,
-    hazards: p.hazards ?? [], start: p.owner, cell: cell + "Z", home: homeOf.get(p.id) ?? 0,
-  };
-});
+export const PLANETS: GPlanet[] = g.planets.map((p) => ({
+  id: p.id, name: p.name, sector: p.sector, x: sx(p.x), y: sy(p.y), biome: p.biome, env: p.env,
+  hazards: p.hazards ?? [], start: p.owner, home: homeOf.get(p.id) ?? 0,
+}));
 
-export const SECTORS: GSector[] = g.sectors.map((s) => ({ id: s.id, name: s.name, x: sx(s.x), y: sy(s.y), planets: s.planets }));
+const ringPath = (flat: number[]) => {
+  let d = "";
+  for (let i = 0; i < flat.length; i += 2) d += `${i ? "L" : "M"}${sx(flat[i])} ${sy(flat[i + 1])}`;
+  return d + "Z";
+};
+
+export const SECTORS: GSector[] = g.sectors.map((s) => ({ id: s.id, name: s.name, x: sx(s.x), y: sy(s.y), planets: s.planets, path: ringPath(s.shape) }));
 
 /** Supply lines: pairs of planet ids. */
 export const LINKS: [number, number][] = g.links;
@@ -73,27 +75,22 @@ export const LINKS: [number, number][] = g.links;
 export const NEIGHBOURS: number[][] = PLANETS.map(() => []);
 for (const [a, b] of LINKS) { NEIGHBOURS[a].push(b); NEIGHBOURS[b].push(a); }
 
-/** Every sector border edge as one path. */
-export const BORDER_PATH = g.borders.map((b) => `M${sx(b[0])} ${sy(b[1])}L${sx(b[2])} ${sy(b[3])}`).join("");
+/** The sector borders, every edge once: between two sectors, and the outer edge of the galaxy. */
+const edge = (b: number[]) => `M${sx(b[0])} ${sy(b[1])}L${sx(b[2])} ${sy(b[3])}`;
+export const BORDER_PATH = g.borders.filter((b) => b[5] >= 0).map(edge).join("");
+export const EDGE_PATH = g.borders.filter((b) => b[5] < 0).map(edge).join("");
+/** The edges between two sectors, with the sectors on each side, for the front lines. */
+export const SECTOR_EDGES: { d: string; a: number; b: number }[] = g.borders.filter((b) => b[5] >= 0).map((b) => ({ d: edge(b), a: b[4], b: b[5] }));
 
-/** Cell edges shared by planets. Where the planets have different owners, the territory line runs. */
-export interface SharedEdge { planets: number[]; d: string }
-export const SHARED_EDGES: SharedEdge[] = (() => {
-  const by = new Map<string, { planets: number[]; d: string }>();
-  for (const p of g.planets) {
-    const c = p.cell;
-    const n = c.length / 2;
-    for (let i = 0; i < n; i++) {
-      const a = [c[2 * i], c[2 * i + 1]], b = [c[(2 * (i + 1)) % c.length], c[(2 * (i + 1) + 1) % c.length]];
-      const [lo, hi] = a[0] < b[0] || (a[0] === b[0] && a[1] <= b[1]) ? [a, b] : [b, a];
-      const key = `${lo[0]},${lo[1]},${hi[0]},${hi[1]}`;
-      const e = by.get(key);
-      if (e) { if (!e.planets.includes(p.id)) e.planets.push(p.id); }
-      else by.set(key, { planets: [p.id], d: `M${sx(lo[0])} ${sy(lo[1])}L${sx(hi[0])} ${sy(hi[1])}` });
-    }
-  }
-  return [...by.values()].filter((e) => e.planets.length > 1);
-})();
+/** Who holds a sector: the enemy with the most planets there (the first on a tie), or Super Earth when
+ *  no enemy holds any; `share` is the part of the planets that enemy holds. */
+export function sectorHolder(own: number[], s: GSector): { owner: number; share: number } {
+  const n = [0, 0, 0, 0];
+  for (const p of s.planets) n[own[p] ?? 0]++;
+  let best = 0;
+  for (let o = 1; o < 4; o++) if (n[o] > n[best] || (best === 0 && n[o] > 0)) best = o;
+  return { owner: best, share: s.planets.length ? n[best] / s.planets.length : 0 };
+}
 
 /** The starting owner of every planet. */
 export const START_OWNERS: number[] = PLANETS.map((p) => p.start);

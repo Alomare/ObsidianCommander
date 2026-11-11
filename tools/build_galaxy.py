@@ -2,24 +2,36 @@
 positions, sectors and supply lines) with each planet given a HELLDIVERS environment and a starting
 owner, plus the shapes every map draws from.
 
-Usage: python -P tools/build_galaxy.py <planets.json> [--preview <png>]
+Usage: python -I tools/build_galaxy.py <planets.json> <sectors.svg> [--preview <png>]
+(--preview needs Pillow: run it with -P instead of -I.)
 
 <planets.json> is the planet list of the community HELLDIVERS 2 API (api.helldivers2.dev/api/v1/planets),
-saved once. Only names, sectors, positions, supply lines and biome names are read. The output is
+saved once. Only names, sectors, positions, supply lines and biome names are read. <sectors.svg> is
+the outline of every HELLDIVERS 2 sector, traced from the game map by the HELLDIVERS 2 War History
+Central project (github.com/crosswaveomega/helldiversplanettable, src/data/sectors.svg): a 4000 x
+4000 frame with Super Earth at the centre, y down, 2000 units to the planet position 1. The output is
 plain data, so the server, the war screens and the Evolved War Engine mod all draw the same map.
 
-Shapes: every planet gets a Voronoi cell inside the galaxy rim, and a sector is the union of the
-cells of its planets. The cells are convex, so a game gui (triangle fans only) can fill them, and the
-sector borders are the cell edges between planets of different sectors.
+Shapes: each sector keeps the traced outline (`shape`), cut into convex pieces (`pieces`) because a
+game gui fills only triangle fans. `borders` holds every sector edge once: two sectors traced side by
+side share one line.
 """
 import json
 import math
+import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-RIM = 1.06          # galaxy edge, in map units (planets reach about 0.95)
-RIM_SIDES = 96
+RIM = 1.0           # galaxy edge, in map units (the outer sectors end at about 0.995)
 ROUND = 4           # decimals kept in the output
+CURVE_STEP = 30     # SVG units between points on a traced curve
+SIMPLIFY = 0.0012   # map units a dropped point may be off the outline
+SHARED = 0.006      # map units within which two traced edges count as one border
+SOL_SIDES = 40
+SVG_NS = "{http://www.w3.org/2000/svg}"
+# HELLDIVERS 2 sector name -> id in the SVG, where the SVG spells it differently.
+SVG_IDS = {"altus": "atlus", "jin xi": "jinxi", "xi tauri": "xitauri", "l'estrade": "lestrade"}
 
 # Factions: 0 Super Earth, 1 bugs, 2 cyborgs, 3 illuminates (HD1 enemy index = faction - 1).
 FACTIONS = ["superearth", "bugs", "cyborgs", "illuminates"]
@@ -50,13 +62,17 @@ ROMAN = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII
 
 
 def title(name):
-    """MALEVELON CREEK -> Malevelon Creek; keeps numerals and codes like X-45 or LM-1 upper case."""
+    """MALEVELON CREEK -> Malevelon Creek, WIDOW'S HARBOR -> Widow's Harbor, CERBERUS IIIC ->
+    Cerberus IIIc; keeps numerals and codes like X-45 or LM-1 upper case."""
     out = []
     for word in name.split(" "):
         if word.upper() in ROMAN or any(c.isdigit() for c in word):
             out.append(word.upper())
+        elif len(word) > 1 and word[:-1].upper() in ROMAN and word[-1].isalpha():
+            out.append(word[:-1].upper() + word[-1].lower())
         elif "'" in word:
-            out.append("'".join(p.capitalize() for p in word.lower().split("'")))
+            first, *rest = word.lower().split("'")
+            out.append("'".join([first.capitalize()] + [p.capitalize() if len(p) > 1 else p for p in rest]))
         elif "-" in word:
             out.append("-".join(p.capitalize() for p in word.lower().split("-")))
         else:
@@ -64,58 +80,220 @@ def title(name):
     return " ".join(out)
 
 
-def clip(poly, px, py, qx, qy):
-    """Keeps the part of a convex polygon (list of (x, y, tag)) closer to p than to q. The new
-    edge along the bisector gets q's tag through the vertex that starts it."""
-    mx, my = (px + qx) / 2, (py + qy) / 2
-    nx, ny = qx - px, qy - py
+# ---------------------------------------------------------------- sector outlines
 
-    def side(x, y):
-        return (x - mx) * nx + (y - my) * ny  # <= 0 keeps
+def svg_ring(d):
+    """The points of one closed SVG path (M, L, H, V, C and Z, absolute or relative), curves sampled
+    every CURVE_STEP units."""
+    toks = re.findall(r"[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)(?:[eE]-?\d+)?", d)
+    i, cmd = 0, None
+    x = y = 0.0
+    pts = []
+
+    def num():
+        nonlocal i
+        v = float(toks[i])
+        i += 1
+        return v
+
+    while i < len(toks):
+        if toks[i].isalpha():
+            cmd = toks[i]
+            i += 1
+            if cmd in "zZ":
+                continue
+        rel, c = cmd.islower(), cmd.upper()
+        if c == "M" or c == "L":
+            nx, ny = num(), num()
+            x, y = (x + nx, y + ny) if rel else (nx, ny)
+            pts.append((x, y))
+            if c == "M":
+                cmd = "l" if rel else "L"
+        elif c == "H":
+            nx = num()
+            x = x + nx if rel else nx
+            pts.append((x, y))
+        elif c == "V":
+            ny = num()
+            y = y + ny if rel else ny
+            pts.append((x, y))
+        elif c == "C":
+            a = [num() for _ in range(6)]
+            if rel:
+                a = [a[0] + x, a[1] + y, a[2] + x, a[3] + y, a[4] + x, a[5] + y]
+            length = math.dist((x, y), a[0:2]) + math.dist(a[0:2], a[2:4]) + math.dist(a[2:4], a[4:6])
+            n = max(1, round(length / CURVE_STEP))
+            for k in range(1, n + 1):
+                t = k / n
+                m = 1 - t
+                pts.append((m ** 3 * x + 3 * m * m * t * a[0] + 3 * m * t * t * a[2] + t ** 3 * a[4],
+                            m ** 3 * y + 3 * m * m * t * a[1] + 3 * m * t * t * a[3] + t ** 3 * a[5]))
+            x, y = a[4], a[5]
+        else:
+            sys.exit(f"sectors.svg: path command {cmd} isn't read")
+    if len(pts) > 1 and math.dist(pts[0], pts[-1]) < 1e-6:
+        pts.pop()
+    return pts
+
+
+def area(ring):
+    return sum(ring[k][0] * ring[(k + 1) % len(ring)][1] - ring[(k + 1) % len(ring)][0] * ring[k][1] for k in range(len(ring))) / 2
+
+
+def seg_dist(p, a, b):
+    ax, ay = a
+    dx, dy = b[0] - ax, b[1] - ay
+    l2 = dx * dx + dy * dy
+    t = 0 if l2 == 0 else max(0, min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / l2))
+    return math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy)
+
+
+def point_in(p, poly):
+    """Whether p is inside a convex counter-clockwise polygon."""
+    m = len(poly)
+    return all((poly[(k + 1) % m][0] - poly[k][0]) * (p[1] - poly[k][1]) - (poly[(k + 1) % m][1] - poly[k][1]) * (p[0] - poly[k][0]) >= -1e-9
+               for k in range(m))
+
+
+def simplify(ring, tol):
+    """Drops points that sit within tol of the line through their neighbours, a closed ring
+    Douglas-Peucker split at the two points furthest apart."""
+    def dp(pts):
+        if len(pts) < 3:
+            return pts
+        k, far = 0, -1.0
+        for j in range(1, len(pts) - 1):
+            d = seg_dist(pts[j], pts[0], pts[-1])
+            if d > far:
+                k, far = j, d
+        if far <= tol:
+            return [pts[0], pts[-1]]
+        return dp(pts[:k + 1])[:-1] + dp(pts[k:])
+
+    n = len(ring)
+    a = 0
+    b = max(range(n), key=lambda j: math.dist(ring[0], ring[j]))
+    first = dp(ring[a:b + 1])
+    second = dp(ring[b:] + ring[:1])
+    return first[:-1] + second[:-1]
+
+
+def convex_pieces(ring):
+    """Cuts a counter-clockwise ring into convex pieces: ear clipping, then neighbouring triangles
+    merged while the result stays convex (Hertel-Mehlhorn)."""
+    n = len(ring)
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    def inside(p, a, b, c):
+        return cross(a, b, p) >= -1e-12 and cross(b, c, p) >= -1e-12 and cross(c, a, p) >= -1e-12
+
+    idx = list(range(n))
+    tris = []
+    guard = 0
+    while len(idx) > 3 and guard < 10000:
+        guard += 1
+        m = len(idx)
+        for k in range(m):
+            i0, i1, i2 = idx[(k - 1) % m], idx[k], idx[(k + 1) % m]
+            a, b, c = ring[i0], ring[i1], ring[i2]
+            if cross(a, b, c) <= 1e-12:
+                continue
+            if any(inside(ring[j], a, b, c) for j in idx if j not in (i0, i1, i2)):
+                continue
+            tris.append([i0, i1, i2])
+            idx.pop(k)
+            break
+        else:
+            sys.exit("sectors.svg: a sector outline can't be cut into triangles")
+    tris.append(idx[:])
+
+    def convex(poly):
+        m = len(poly)
+        return all(cross(ring[poly[k]], ring[poly[(k + 1) % m]], ring[poly[(k + 2) % m]]) >= -1e-10 for k in range(m))
+
+    polys = tris
+    merged = True
+    while merged:
+        merged = False
+        for p in range(len(polys)):
+            for q in range(p + 1, len(polys)):
+                a, b = polys[p], polys[q]
+                for ka in range(len(a)):
+                    u, v = a[ka], a[(ka + 1) % len(a)]
+                    if v in b and b[(b.index(v) + 1) % len(b)] == u:
+                        # a runs u -> v, b runs v -> u: join b into a along that edge.
+                        kb = b.index(u)
+                        rest = [b[(kb + 1 + t) % len(b)] for t in range(len(b) - 2)]
+                        joined = a[:ka + 1] + rest + a[ka + 1:]
+                        if convex(joined):
+                            polys[p] = joined
+                            polys.pop(q)
+                            merged = True
+                        break
+                if merged:
+                    break
+            if merged:
+                break
+    return [[ring[k] for k in poly] for poly in polys]
+
+
+def sector_shapes(svg_path, sector_names):
+    """{sector index: ring} in map units, y up, counter-clockwise."""
+    root = ET.parse(svg_path).getroot()
+    paths = {p.get("id"): p.get("d") for p in root.iter(SVG_NS + "path")}
+    circles = {c.get("id"): c for c in root.iter(SVG_NS + "circle")}
+
+    def to_map(p):
+        return ((p[0] - 2000) / 2000, (2000 - p[1]) / 2000)
+
+    out = {}
+    for s, name in enumerate(sector_names):
+        key = SVG_IDS.get(name.lower(), name.lower())
+        if key in paths:
+            ring = [to_map(p) for p in svg_ring(paths[key])]
+        elif key in circles:
+            c = circles[key]
+            cx, cy, r = float(c.get("cx")), float(c.get("cy")), float(c.get("r"))
+            ring = [to_map((cx + r * math.cos(2 * math.pi * k / SOL_SIDES), cy - r * math.sin(2 * math.pi * k / SOL_SIDES)))
+                    for k in range(SOL_SIDES)]
+        else:
+            sys.exit(f"sectors.svg has no outline for {name}")
+        if area(ring) < 0:
+            ring.reverse()
+        if key not in circles:
+            ring = simplify(ring, SIMPLIFY)
+        out[s] = ring
+    return out
+
+
+def shared_borders(shapes):
+    """Every sector edge once: an edge that runs within SHARED of an edge of a sector drawn before
+    belongs to that border already. Each edge is [x1, y1, x2, y2, sector, other or -1 at the rim]."""
+    edges = {s: [(ring[k], ring[(k + 1) % len(ring)]) for k in range(len(ring))] for s, ring in shapes.items()}
+
+    def near(p, s):
+        return any(seg_dist(p, a, b) <= SHARED for a, b in edges[s])
 
     out = []
-    n = len(poly)
-    for i in range(n):
-        ax, ay, at = poly[i]
-        bx, by, _ = poly[(i + 1) % n]
-        sa, sb = side(ax, ay), side(bx, by)
-        if sa <= 0:
-            out.append((ax, ay, at))
-        if (sa <= 0) != (sb <= 0):
-            t = sa / (sa - sb)
-            x, y = ax + (bx - ax) * t, ay + (by - ay) * t
-            # Entering the kept side: the edge from here keeps a's tag. Leaving: the edge from the
-            # crossing runs along the bisector, tagged with q.
-            out.append((x, y, at if sa > 0 else None))
-    # Fix the tags: an edge whose start came from leaving the kept side lies on the bisector.
-    fixed = []
-    for i, (x, y, t) in enumerate(out):
-        fixed.append((x, y, "Q" if t is None else t))
-    return fixed
-
-
-def cell_of(i, pts):
-    px, py = pts[i]
-    poly = [(RIM * math.cos(2 * math.pi * k / RIM_SIDES), RIM * math.sin(2 * math.pi * k / RIM_SIDES), -1)
-            for k in range(RIM_SIDES)]
-    order = sorted(range(len(pts)), key=lambda j: (pts[j][0] - px) ** 2 + (pts[j][1] - py) ** 2)
-    for j in order:
-        if j == i:
-            continue
-        qx, qy = pts[j]
-        # A neighbour further than twice the farthest corner can't cut the cell.
-        reach = max(math.hypot(x - px, y - py) for x, y, _ in poly)
-        if math.hypot(qx - px, qy - py) > 2 * reach:
-            break
-        poly = [(x, y, j if t == "Q" else t) for x, y, t in clip(poly, px, py, qx, qy)]
-    return poly
+    order = sorted(shapes)
+    for i, s in enumerate(order):
+        for a, b in edges[s]:
+            mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+            if any(near(a, t) and near(b, t) and near(mid, t) for t in order[:i]):
+                continue
+            other = next((t for t in order if t != s and near(mid, t)), -1)
+            out.append([a[0], a[1], b[0], b[1], s, other])
+    return out
 
 
 def main():
     args = sys.argv[1:]
-    if not args:
+    if len(args) < 2:
         sys.exit(__doc__)
     src = Path(args[0])
+    svg = Path(args[1])
     preview = Path(args[args.index("--preview") + 1]) if "--preview" in args else None
     raw = json.loads(src.read_text(encoding="utf-8"))
     raw.sort(key=lambda p: p["index"])
@@ -173,7 +351,7 @@ def main():
         links.add(tuple(sorted((a, b))))
         added += 1
 
-    cells = [cell_of(k, pts) for k in range(len(raw))]
+    shapes = sector_shapes(svg, sector_names)
 
     # Sector centres (mean of the planets) and the starting owner of each sector.
     sectors = []
@@ -207,20 +385,16 @@ def main():
                 homes[f] = k
                 owner[k] = f
 
-    # Sector borders: cell edges between planets of different sectors, and the rim.
-    borders, rim = [], []
-    for k, poly in enumerate(cells):
-        n = len(poly)
-        for e in range(n):
-            ax, ay, tag = poly[e]
-            bx, by, _ = poly[(e + 1) % n]
-            if tag == -1:
-                rim.append((ax, ay, bx, by))
-            elif isinstance(tag, int) and tag > k and raw[tag]["sector"] != raw[k]["sector"]:
-                borders.append((ax, ay, bx, by, sid[raw[k]["sector"]], sid[raw[tag]["sector"]]))
+    borders = shared_borders(shapes)
+    pieces = {s: convex_pieces(ring) for s, ring in shapes.items()}
+    outside = [raw[k]["name"] for k in range(len(raw))
+               if not any(point_in(pts[k], piece) for piece in pieces[sid[raw[k]["sector"]]])]
 
     def r(v):
         return round(v, ROUND)
+
+    def flat(ring):
+        return [r(v) for x, y in ring for v in (x, y)]
 
     planets = []
     for k, p in enumerate(raw):
@@ -236,17 +410,17 @@ def main():
             "env": ENV.get(biome, 0),
             "hazards": [h["name"] for h in p.get("hazards") or [] if h.get("name") not in (None, "None")],
             "owner": owner[k],
-            "cell": [r(v) for x, y, _ in cells[k] for v in (x, y)],
         })
     out = {
         "galaxy": "hd2",
-        "version": 1,
-        "about": "HELLDIVERS 2 galaxy layout: planet names, positions, sectors and supply lines. Environments and starting owners are set for HELLDIVERS (2015).",
+        "version": 2,
+        "about": "HELLDIVERS 2 galaxy layout: planet names, positions, sectors and supply lines, and the sector outlines traced from the game map by the HELLDIVERS 2 War History Central project. Environments and starting owners are set for HELLDIVERS (2015).",
         "factions": FACTIONS,
         "rim": RIM,
         "homes": {FACTIONS[f]: k for f, k in homes.items()},
         "sectors": [{"id": i, "name": s["name"], "x": r(s["cx"]), "y": r(s["cy"]), "owner": s["owner"],
-                     "planets": s["planets"]} for i, s in enumerate(sectors)],
+                     "planets": s["planets"], "shape": flat(shapes[i]), "pieces": [flat(p) for p in pieces[i]]}
+                    for i, s in enumerate(sectors)],
         "planets": planets,
         "links": sorted([list(l) for l in links]),
         "borders": [[r(a), r(b), r(c), r(d), s1, s2] for a, b, c, d, s1, s2 in borders],
@@ -257,7 +431,9 @@ def main():
         f.write("\n")
     counts = [sum(1 for o in owner if o == f) for f in range(4)]
     print(f"{dest}: {len(planets)} planets, {len(sectors)} sectors, {len(links)} links ({added} added to join islands), "
-          f"{len(borders)} border edges; owners {dict(zip(FACTIONS, counts))}; homes {homes}; {dest.stat().st_size // 1024} KB")
+          f"{len(borders)} border edges, {sum(len(v) for v in shapes.values())} outline points in "
+          f"{sum(len(v) for v in pieces.values())} convex pieces; owners {dict(zip(FACTIONS, counts))}; homes {homes}; {dest.stat().st_size // 1024} KB")
+    print(f"  planets outside the outline of their own sector: {', '.join(outside) or 'none'}")
     for i, s in enumerate(sectors):
         ang = math.degrees(math.atan2(s["cy"], s["cx"])) % 360
         print(f"  {i:2d} {s['name']:<12} r={math.hypot(s['cx'], s['cy']):.2f} a={ang:5.1f} owner={FACTIONS[s['owner']]}")
@@ -275,10 +451,11 @@ def draw_preview(g, path):
     def px(x, y):
         return (size / 2 + x * size * 0.46, size / 2 - y * size * 0.46)
 
-    for p in g["planets"]:
-        c = cols[p["owner"]]
-        pts = [px(p["cell"][i], p["cell"][i + 1]) for i in range(0, len(p["cell"]), 2)]
-        d.polygon(pts, fill=c + (40 if p["owner"] == 0 else 70,))
+    for s in g["sectors"]:
+        c = cols[s["owner"]]
+        for piece in s["pieces"]:
+            pts = [px(piece[i], piece[i + 1]) for i in range(0, len(piece), 2)]
+            d.polygon(pts, fill=c + (40 if s["owner"] == 0 else 70,), outline=(255, 0, 255, 40))
     for a, b, c2, e, _, _ in g["borders"]:
         d.line([px(a, b), px(c2, e)], fill=(255, 255, 255, 120), width=2)
     for a, b in g["links"]:

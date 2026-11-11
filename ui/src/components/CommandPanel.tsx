@@ -6,7 +6,7 @@ import { ago, clock, enemyName, memberName, num, pct, regionName, regionOf, regi
 import { FACTION_ACCENT, HELLDIVER_ACCENT, regionState, type Selection } from "../map/GalaxyMap";
 import { useTween } from "../hooks";
 import { EnemyIcon, IChevron, IDown, IFlag, IInfo, IShield, ITarget, IUp, IWarn } from "./Icons";
-import { Bar, Confirm, NumberField, Seg } from "./ui";
+import { Bar, Confirm, NumberField, Range, Seg } from "./ui";
 import type { SeasonAsk } from "./WarView";
 
 /** Seen by the server within this many seconds: playing now. */
@@ -134,7 +134,7 @@ function FrontPanel({ war, front, region, names, readOnly, run, nowUnix }: Props
             )}
             <div className="inline-form">
               <span className="if-label">{t("frontPoints")}</span>
-              <input type="range" min={0} max={front.points_max} step={step / 20} value={points} onChange={(e) => setPoints(Number(e.target.value))} aria-label={t("frontPoints")} />
+              <Range min={0} max={front.points_max} step={step / 20} value={points} onChange={setPoints} label={t("frontPoints")} />
               <div className="if-row">
                 <NumberField value={points} min={0} max={front.points_max} step={100} onChange={setPoints} suffix={t("points")} />
                 <button className="btn small" disabled={points === Math.round(front.points)} onClick={() => run({ action: "set_points", front: enemy, points })}>{t("apply")}</button>

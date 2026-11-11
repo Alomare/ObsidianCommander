@@ -4,6 +4,13 @@ import { createPortal } from "react-dom";
 import { t } from "../strings";
 import { IClose } from "./Icons";
 
+/** A slider: the track fills gold up to the value (--pct, read by the CSS). */
+export function Range({ min, max, step, value, onChange, label, disabled }: { min: number; max: number; step: number; value: number; onChange: (v: number) => void; label: string; disabled?: boolean }) {
+  const pct = max > min ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100)) : 0;
+  return <input type="range" className="range" min={min} max={max} step={step} value={value} disabled={disabled} aria-label={label}
+    style={{ "--pct": `${pct.toFixed(2)}%` } as CSSProperties} onChange={(e) => onChange(Number(e.target.value))} />;
+}
+
 /* Tooltips: any element with data-tip (and an optional data-tip-title) shows one on hover or focus. */
 export function TipLayer() {
   const [tip, setTip] = useState<{ title?: string; text: string; x: number; y: number; below: boolean } | null>(null);

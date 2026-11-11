@@ -4,7 +4,7 @@ import { api } from "../api";
 import { EVO_FIELDS, evoPatch, sanitizeEvo, type EvoField } from "../evolved";
 import { t, tk, type StringKey } from "../strings";
 import type { EvoSettings, War } from "../types";
-import { Modal, NumberField, Switch, notify } from "./ui";
+import { Modal, NumberField, Range, Switch, notify } from "./ui";
 
 function unit(f: EvoField): string {
   if (f.kind === "hours") return t("hours");
@@ -35,8 +35,8 @@ export function EvolvedSettingsForm({ value, onChange }: { value: EvoSettings; o
                   {f.kind === "bool"
                     ? <Switch on={!!v} onChange={(x) => set(f, x)} label={tk(`evoSet_${f.key}`)} />
                     : <>
-                      <input type="range" min={f.min} max={f.slide} step={f.step} value={Math.min(f.slide, Number(v))} disabled={off}
-                        onChange={(e) => set(f, Number(e.target.value))} aria-label={tk(`evoSet_${f.key}`)} />
+                      <Range min={f.min} max={f.slide} step={f.step} value={Math.min(f.slide, Number(v))} disabled={off}
+                        onChange={(x) => set(f, x)} label={tk(`evoSet_${f.key}`)} />
                       <NumberField value={Number(v)} min={f.min} max={f.max} step={f.step} onChange={(x) => set(f, f.kind === "int" ? Math.round(x) : x)} suffix={unit(f)} />
                     </>}
                 </div>
