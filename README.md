@@ -16,6 +16,7 @@ Two kinds of war, local or over LAN:
 | [data/warfront.json](data/warfront.json) | The in-game war map: regions as cells on a polar grid, and the map colours |
 | [data/galaxy-hd2.json](data/galaxy-hd2.json) | The Evolved war map: the HELLDIVERS 2 galaxy layout and sector outlines (traced by [HELLDIVERS 2 War History Central](https://github.com/crosswaveomega/helldiversplanettable)), built by [tools/build_galaxy.py](tools/build_galaxy.py) |
 | [tools/pack.py](tools/pack.py) | Builds the package ZIP that Obsidian installs, in `internal/builds/` |
+| [tools/sign.py](tools/sign.py) | Signs the package ZIP with the key Obsidian updates are signed with. Obsidian installs a downloaded package only with that signature in the release |
 | [tools/e2e.py](tools/e2e.py) | Checks a package end to end without the game: server, game requests, the Obsidian relay, GM actions, LAN and screenshots |
 | [probe/](probe/) | The in-game probes of 2026-11-04 and 2026-11-09 |
 
