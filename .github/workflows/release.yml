@@ -1,6 +1,7 @@
-# A release: pushing a tag like v0.5.0 on main builds the war server and the war screens, packs
-# obsidian-commander-<version>.zip, signs it and publishes both with the notes in
-# docs/releases/<version>.md. Obsidian installs a downloaded package only with that signature.
+# A release: pushing a tag like v0.5.0 on main builds the war server and the war screens on Windows
+# and on Linux, packs obsidian-commander-<version>.zip (Windows) and
+# commander-linux-x86_64-<version>.zip (Linux), signs each and publishes all four files with the
+# notes in docs/releases/<version>.md. Obsidian installs a downloaded package only with that signature.
 #
 # The rules for a release:
 # - The tag matches the version in server/Cargo.toml and ui/package.json.
@@ -22,13 +23,18 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  package:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            zip: obsidian-commander
+          - os: ubuntu-24.04
+            zip: commander-linux-x86_64
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,12 +48,16 @@ jobs:
           [ -s "docs/releases/$v.md" ] || { echo "::error::docs/releases/$v.md is missing"; exit 1; }
           [ -n "$KEY" ] || { echo "::error::Add the repository secrets TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD first."; exit 1; }
           echo "VERSION=$v" >> "$GITHUB_ENV"
+          echo "ZIP=internal/builds/${{ matrix.zip }}-$v.zip" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Server tests
@@ -58,6 +68,7 @@ jobs:
         run: |
           (cd ui && npm ci)
           python tools/pack.py
+          [ -s "$ZIP" ] || { echo "::error::pack.py did not write $ZIP"; exit 1; }
 
       # The signer is the Tauri CLI, as for the Obsidian updates. It reads the key and the password
       # from the environment and writes <zip>.sig beside the ZIP.
@@ -66,15 +77,36 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          zip="internal/builds/obsidian-commander-$VERSION.zip"
-          npx --yes @tauri-apps/cli@2.12.1 signer sign "$zip" > /dev/null
-          [ -s "$zip.sig" ] || { echo "::error::no signature was written"; exit 1; }
+          npx --yes @tauri-apps/cli@2.12.1 signer sign "$ZIP" > /dev/null
+          [ -s "$ZIP.sig" ] || { echo "::error::no signature was written"; exit 1; }
           python -m pip install -q pynacl
-          python tools/verify_sig.py "$zip"
+          python tools/verify_sig.py "$ZIP"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.zip }}
+          path: |
+            ${{ env.ZIP }}
+            ${{ env.ZIP }}.sig
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
 
       - name: Publish
         run: |
-          zip="internal/builds/obsidian-commander-$VERSION.zip"
+          v="${GITHUB_REF_NAME#v}"
           pre=""
           [[ "$GITHUB_REF_NAME" == *-* ]] && pre="--prerelease"
-          gh release create "$GITHUB_REF_NAME" "$zip.sig" "$zip" --title "Obsidian Commander $VERSION" --notes-file "docs/releases/$VERSION.md" $pre
+          ls -la out
+          gh release create "$GITHUB_REF_NAME" out/*.zip.sig out/*.zip --title "Obsidian Commander $v" --notes-file "docs/releases/$v.md" $pre

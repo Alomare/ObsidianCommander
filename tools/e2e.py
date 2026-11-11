@@ -79,7 +79,8 @@ def shot(exe, url, out, size="1440,860"):
 
 def main():
     ap = argparse.ArgumentParser()
-    builds = sorted((REPO / "internal" / "builds").glob("obsidian-commander-*.zip"))
+    pattern = "obsidian-commander-*.zip" if sys.platform == "win32" else "commander-linux-x86_64-*.zip"
+    builds = sorted((REPO / "internal" / "builds").glob(pattern))
     ap.add_argument("--zip", default=str(builds[-1]) if builds else None)
     ap.add_argument("--obsidian", default=str(REPO.parent / "ObsidianLauncher"))
     ap.add_argument("--shots", default=str(REPO / "internal" / "e2e-shots"))
@@ -98,6 +99,9 @@ def main():
     with zipfile.ZipFile(a.zip) as z:
         z.extractall(pkg)
     manifest = json.loads((pkg / "commander.json").read_text())
+    if sys.platform != "win32":
+        # extractall drops the run permission; Obsidian sets it again on install the same way.
+        (pkg / manifest["server"]).chmod(0o755)
     check("package manifest", manifest.get("protocol") == 1 and (pkg / manifest["server"]).is_file() and (pkg / manifest["ui"] / "index.html").is_file())
 
     proc = subprocess.Popen([str(pkg / manifest["server"]), "--data", str(work / "data"), "--port", "0", "--token", TOKEN, "--ui", str(pkg / manifest["ui"])],

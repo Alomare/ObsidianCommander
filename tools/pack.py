@@ -3,9 +3,13 @@
 python tools/pack.py [--no-build]
 
 Builds the server (cargo build --release) and the interface (npm run build) unless --no-build, then
-writes internal/builds/obsidian-commander-<version>.zip:
+writes the package for the system it runs on, in internal/builds:
 
-    commander.json, commander-server.exe, ui/..., LICENSE, THIRD-PARTY-NOTICES.txt
+    Windows: obsidian-commander-<version>.zip, with commander-server.exe
+    Linux:   commander-linux-x86_64-<version>.zip, with commander-server (run permission set)
+
+Each holds commander.json, the server, ui/..., LICENSE and THIRD-PARTY-NOTICES.txt. The Linux name
+shares no prefix with the Windows one, so Obsidian releases before Linux support never pick it.
 
 The version comes from the server crate. The interface mock file stays out: it only serves `?mock=1`
 during development.
@@ -47,17 +51,22 @@ def main():
     if not a.no_build:
         run(["cargo", "build", "--release"], SERVER)
         run(["npm", "run", "build"], UI)
-    exe = SERVER / "target" / "release" / "commander-server.exe"
+    windows = sys.platform == "win32"
+    server = "commander-server.exe" if windows else "commander-server"
+    exe = SERVER / "target" / "release" / server
     dist = UI / "dist"
     if not exe.is_file() or not (dist / "index.html").is_file():
         sys.exit("build the server and the interface first")
     v = version()
     OUT.mkdir(parents=True, exist_ok=True)
-    out = OUT / f"obsidian-commander-{v}.zip"
-    manifest = {"name": "Obsidian Commander", "version": v, "protocol": PROTOCOL, "server": "commander-server.exe", "ui": "ui"}
+    out = OUT / (f"obsidian-commander-{v}.zip" if windows else f"commander-linux-x86_64-{v}.zip")
+    manifest = {"name": "Obsidian Commander", "version": v, "protocol": PROTOCOL, "server": server, "ui": "ui"}
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("commander.json", json.dumps(manifest, indent=2) + "\n")
-        z.write(exe, "commander-server.exe")
+        info = zipfile.ZipInfo.from_file(exe, server)
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = (0o100755 << 16) if not windows else info.external_attr
+        z.writestr(info, exe.read_bytes())
         for f in sorted(dist.rglob("*")):
             if f.is_file() and "mock" not in f.name.lower():
                 z.write(f, "ui/" + f.relative_to(dist).as_posix())
