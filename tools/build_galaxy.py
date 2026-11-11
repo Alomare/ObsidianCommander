@@ -13,8 +13,9 @@ Central project (github.com/crosswaveomega/helldiversplanettable, src/data/secto
 plain data, so the server, the war screens and the Evolved War Engine mod all draw the same map.
 
 Shapes: each sector keeps the traced outline (`shape`), cut into convex pieces (`pieces`) because a
-game gui fills only triangle fans. `borders` holds every sector edge once: two sectors traced side by
-side share one line.
+game gui fills only triangle fans. The outlines are first knitted into one network (see knit), so
+two sectors side by side hold the same points along their border. `borders` holds every sector
+edge once, in runs that join end to end.
 """
 import json
 import math
@@ -155,29 +156,6 @@ def point_in(p, poly):
                for k in range(m))
 
 
-def simplify(ring, tol):
-    """Drops points that sit within tol of the line through their neighbours, a closed ring
-    Douglas-Peucker split at the two points furthest apart."""
-    def dp(pts):
-        if len(pts) < 3:
-            return pts
-        k, far = 0, -1.0
-        for j in range(1, len(pts) - 1):
-            d = seg_dist(pts[j], pts[0], pts[-1])
-            if d > far:
-                k, far = j, d
-        if far <= tol:
-            return [pts[0], pts[-1]]
-        return dp(pts[:k + 1])[:-1] + dp(pts[k:])
-
-    n = len(ring)
-    a = 0
-    b = max(range(n), key=lambda j: math.dist(ring[0], ring[j]))
-    first = dp(ring[a:b + 1])
-    second = dp(ring[b:] + ring[:1])
-    return first[:-1] + second[:-1]
-
-
 def convex_pieces(ring):
     """Cuts a counter-clockwise ring into convex pieces: ear clipping, then neighbouring triangles
     merged while the result stays convex (Hertel-Mehlhorn)."""
@@ -275,30 +253,155 @@ def sector_shapes(svg_path, sector_names):
             sys.exit(f"sectors.svg has no outline for {name}")
         if area(ring) < 0:
             ring.reverse()
-        if key not in circles:
-            ring = simplify(ring, SIMPLIFY)
         out[s] = ring
     return out
 
 
-def shared_borders(shapes):
-    """Every sector edge once: an edge that runs within SHARED of an edge of a sector drawn before
-    belongs to that border already. Each edge is [x1, y1, x2, y2, sector, other or -1 at the rim]."""
-    edges = {s: [(ring[k], ring[(k + 1) % len(ring)]) for k in range(len(ring))] for s, ring in shapes.items()}
+def knit(shapes):
+    """Joins the sector outlines into one network of shared corners, then simplifies it.
 
-    def near(p, s):
-        return any(seg_dist(p, a, b) <= SHARED for a, b in edges[s])
+    The outlines are traced one sector at a time, so two sectors side by side sample their common
+    border at different points and miss each other by a few units. Drawn as they are, border lines
+    overshoot corners or stop short of them. Here every corner within SHARED of another becomes one
+    point, every corner within SHARED of another outline is added to that outline as well, and each
+    stretch of border between two junctions is simplified once for both sides. Two neighbours then
+    hold the very same points along their border.
 
-    out = []
+    Returns ({sector: ring}, borders) with the rings counter-clockwise and borders as
+    [x1, y1, x2, y2, sector, other or -1 at the rim], every edge once, in runs that join end to end."""
     order = sorted(shapes)
-    for i, s in enumerate(order):
-        for a, b in edges[s]:
-            mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-            if any(near(a, t) and near(b, t) and near(mid, t) for t in order[:i]):
+    pts = []        # the shared corners
+    grid = {}       # cell -> corner ids, for the lookups within SHARED
+
+    def cell(p):
+        return (math.floor(p[0] / SHARED), math.floor(p[1] / SHARED))
+
+    def corner(p):
+        cx, cy = cell(p)
+        best, best_d = None, SHARED
+        for gx in (cx - 1, cx, cx + 1):
+            for gy in (cy - 1, cy, cy + 1):
+                for k in grid.get((gx, gy), ()):
+                    d = math.dist(p, pts[k])
+                    if d <= best_d:
+                        best, best_d = k, d
+        if best is not None:
+            return best
+        pts.append(p)
+        grid.setdefault((cx, cy), []).append(len(pts) - 1)
+        return len(pts) - 1
+
+    def dedupe(ring):
+        out = []
+        for k in ring:
+            if not out or out[-1] != k:
+                out.append(k)
+        while len(out) > 1 and out[0] == out[-1]:
+            out.pop()
+        return out
+
+    rings = {s: dedupe([corner(p) for p in shapes[s]]) for s in order}
+
+    # Corners that sit on another outline's edge go into that edge too, until none is left over.
+    for _ in range(8):
+        added = 0
+        for s in order:
+            ring = rings[s]
+            out = []
+            for k in range(len(ring)):
+                i, j = ring[k], ring[(k + 1) % len(ring)]
+                a, b = pts[i], pts[j]
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                l2 = dx * dx + dy * dy
+                out.append(i)
+                if l2 == 0:
+                    continue
+                lo = (min(a[0], b[0]) - SHARED, min(a[1], b[1]) - SHARED)
+                hi = (max(a[0], b[0]) + SHARED, max(a[1], b[1]) + SHARED)
+                on = []
+                for gx in range(math.floor(lo[0] / SHARED), math.floor(hi[0] / SHARED) + 1):
+                    for gy in range(math.floor(lo[1] / SHARED), math.floor(hi[1] / SHARED) + 1):
+                        for m in grid.get((gx, gy), ()):
+                            if m in (i, j) or m in ring:
+                                continue
+                            p = pts[m]
+                            t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2
+                            if 0 < t < 1 and seg_dist(p, a, b) <= SHARED:
+                                on.append((t, m))
+                on.sort()
+                out.extend(m for _, m in on)
+                added += len(on)
+            rings[s] = dedupe(out)
+        if not added:
+            break
+
+    # Every edge once, with the sectors on each side.
+    sides = {}
+    for s in order:
+        ring = rings[s]
+        for k in range(len(ring)):
+            e = frozenset((ring[k], ring[(k + 1) % len(ring)]))
+            sides.setdefault(e, []).append(s)
+    links = {}
+    for e in sides:
+        for k in e:
+            links.setdefault(k, []).append(e)
+
+    # A junction: where three or more edges meet, or the sectors on each side change.
+    def junction(k):
+        es = links[k]
+        return len(es) != 2 or sorted(sides[es[0]]) != sorted(sides[es[1]])
+
+    keep = {k for k in links if junction(k)}
+    walked = set()
+    runs = []
+    starts = sorted(keep) + sorted(links)   # loops with no junction start anywhere
+    for k0 in starts:
+        for e0 in links[k0]:
+            if e0 in walked:
                 continue
-            other = next((t for t in order if t != s and near(mid, t)), -1)
-            out.append([a[0], a[1], b[0], b[1], s, other])
-    return out
+            run, k, e = [k0], k0, e0
+            while True:
+                walked.add(e)
+                (k,) = e - {k}
+                run.append(k)
+                if k in keep or k == k0:
+                    break
+                e = next(x for x in links[k] if x != e)
+            keep.add(k0)
+            line = [pts[m] for m in run]
+            if run[0] == run[-1]:
+                # A closed loop: split at the corner furthest from the start, both halves kept.
+                far = max(range(len(run)), key=lambda m: math.dist(line[0], line[m]))
+                keep.add(run[far])
+                kept = douglas(run[:far + 1], line[:far + 1]) + douglas(run[far:], line[far:])[1:]
+            else:
+                kept = douglas(run, line)
+            keep.update(kept)
+            runs.append((run, sides[e0]))
+
+    rings = {s: [k for k in rings[s] if k in keep] for s in order}
+    borders = []
+    for run, by in runs:
+        kept = [k for k in run if k in keep]
+        a, b = (by + [-1])[:2]
+        for u, v in zip(kept, kept[1:]):
+            borders.append([pts[u][0], pts[u][1], pts[v][0], pts[v][1], a, b])
+    return {s: [pts[k] for k in rings[s]] for s in order}, borders
+
+
+def douglas(ids, line):
+    """The ids of an open polyline that Douglas-Peucker keeps at SIMPLIFY."""
+    if len(ids) < 3:
+        return list(ids)
+    k, far = 0, -1.0
+    for j in range(1, len(ids) - 1):
+        d = seg_dist(line[j], line[0], line[-1])
+        if d > far:
+            k, far = j, d
+    if far <= SIMPLIFY:
+        return [ids[0], ids[-1]]
+    return douglas(ids[:k + 1], line[:k + 1])[:-1] + douglas(ids[k:], line[k:])
 
 
 def main():
@@ -323,7 +426,7 @@ def main():
             p["sector"] = raw[near]["sector"]
 
     # Supply lines, undirected, and every planet reachable from Super Earth: a planet with no
-    # line joins its nearest neighbour, and an island joins the main group at its closest pair.
+    # line joins the nearest neighbour, and an island joins the main group at the closest pair.
     index_of = {p["index"]: k for k, p in enumerate(raw)}
     links = set()
     for k, p in enumerate(raw):
@@ -398,7 +501,7 @@ def main():
                 homes[f] = k
                 owner[k] = f
 
-    borders = shared_borders(shapes)
+    shapes, borders = knit(shapes)
     pieces = {s: convex_pieces(ring) for s, ring in shapes.items()}
     outside = [raw[k]["name"] for k in range(len(raw))
                if not any(point_in(pts[k], piece) for piece in pieces[sid[raw[k]["sector"]]])]
