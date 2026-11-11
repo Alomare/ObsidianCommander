@@ -37,6 +37,8 @@ A custom server must not keep or forward `data`. The probe server logs only the 
 
 `campaign_status[i]` is positional: index 1 is bugs, 2 cyborgs, 3 illuminates (`enemy + 1`). Fields: `season`, `points`, `points_taken`, `points_max`, `status` (`active`, `defeated`, `hidden`), `introduction_order`. The current season is `campaign_status[1].season` (`get_current_season`). The region is `clamp(floor(points / (points_max / 10)) + 1, 1, 10)`.
 
+The Commander server adds `shown_season` to each row: the war season as people see it, from 1. The game reads only the fields it knows. In war mode the Obsidian loader takes `season - shown_season` as the offset and prints the war season in the two game texts with `#SEASON` (the recap date and the season end statistics title), while the game season still goes to the lobby, the requests and the save.
+
 Events: `{season, event_id, start_time, end_time, region, enemy, points_max, points, status}`, where status is `active`, `success` or `fail`. Attack events add `players_at_start` and `max_event_id`. The client adds `event_type`.
 
 ## Writes

@@ -1472,12 +1472,14 @@ impl War {
 
     // ---- views
 
+    /// The fronts as `campaign_status` rows. `shown_season` is extra: the game reads only the fields it knows, and
+    /// the Obsidian loader reads it to print the war season in the game texts instead of the game season.
     pub fn status_rows(&self) -> Value {
         Value::Array(
             self.fronts
                 .iter()
                 .map(|f| {
-                    json!({"season": self.season, "points": f.points_int(), "points_taken": f.points_taken.floor() as i64,
+                    json!({"season": self.season, "shown_season": self.shown_season(), "points": f.points_int(), "points_taken": f.points_taken.floor() as i64,
                            "points_max": f.points_max, "status": f.status.as_str(), "introduction_order": f.introduction_order})
                 })
                 .collect(),
@@ -1894,6 +1896,9 @@ mod tests {
             .filter_map(|f| f.value)
             .collect();
         assert_eq!(started, [2.0, 3.0], "the feed counts as people do");
+        let rows = w.status_rows();
+        assert_eq!(rows[0]["season"], game + 2, "the game keeps the game season");
+        assert_eq!(rows[0]["shown_season"], 3, "the loader shows the war season");
         // A war from before first_season counts back from the seasons it keeps.
         w.first_season = None;
         assert_eq!(w.shown_season(), 3);
