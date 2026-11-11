@@ -12,8 +12,9 @@ import { CommandPanel } from "./CommandPanel";
 import { EvolvedBody } from "./EvolvedView";
 import { EvolvedSettingsDialog } from "./EvolvedSettings";
 import { FeedList, PlayersPanel, SettingsDialog, StatsPanel } from "./Panels";
-import { EnemyIcon, IBack, ICheck, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, ILan, IList, IMore, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
+import { EnemyIcon, IBack, ICheck, IEdit, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, ILan, IList, IMore, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
 import { Confirm, MenuButton, Seg, Switch, notify } from "./ui";
+import { WarInfoDialog } from "./WarInfo";
 
 type Tab = "command" | "feed" | "players" | "stats";
 const TABS: Tab[] = ["command", "feed", "players", "stats"];
@@ -42,7 +43,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const now = useNow(1000);
   const [selection, setSelection] = useState<Selection>(mockStart.sel);
   const [tab, setTab] = useState<Tab>(mockStart.tab);
-  const [dialog, setDialog] = useState<null | "settings" | "delete" | "lan" | SeasonAsk>(null);
+  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "lan" | SeasonAsk>(null);
   const [result, setResult] = useState<"won" | "lost">("won");
 
   /** A Game Master action; true when the server took it. */
@@ -167,6 +168,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
           <div className="bar-tools">
             <button className="btn icon" onClick={() => setDialog("settings")} aria-label={t("settings")} data-tip={t("settings")}><IGear /></button>
             <MenuButton label={t("more")} icon={<IMore />} items={[
+              { label: t("editInfo"), icon: <IEdit />, run: () => setDialog("info") },
               { label: t("exportWar"), icon: <IExport />, run: exportWar },
               { label: t("deleteWar"), icon: <ITrash />, danger: true, run: () => setDialog("delete") },
             ]} />
@@ -222,6 +224,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
       {dialog === "settings" && (evo
         ? <EvolvedSettingsDialog war={war} settings={evo.settings} onClose={() => setDialog(null)} onSaved={accept} />
         : <SettingsDialog war={war} onClose={() => setDialog(null)} onSaved={accept} />)}
+      {dialog === "info" && <WarInfoDialog war={war} onClose={() => setDialog(null)} onSaved={accept} />}
       {dialog === "delete" && (
         <Confirm title={t("deleteWar")} text={t("deleteWarText", { name: war.name })} okLabel={t("delete")} danger onClose={() => setDialog(null)}
           onOk={async () => { try { await api.deleteWar(war.id); onBack(); } catch (e) { notify(e instanceof Error ? e.message : String(e), true); } }} />

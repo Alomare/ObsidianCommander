@@ -49,18 +49,16 @@ export function EvolvedSettingsForm({ value, onChange }: { value: EvoSettings; o
   );
 }
 
-/** Settings on an Evolved war: the name through PATCH, the rules through the evo_settings action. */
+/** Settings on an Evolved war: the rules, through the evo_settings action. The name is in Edit War Info. */
 export function EvolvedSettingsDialog({ war, settings, onClose, onSaved }: { war: War; settings: EvoSettings; onClose: () => void; onSaved: (w: War) => void }) {
-  const [name, setName] = useState(war.name);
   const [value, setValue] = useState<EvoSettings>(settings);
   const [busy, setBusy] = useState(false);
   const patch = evoPatch(settings, sanitizeEvo(value));
-  const dirty = name.trim() !== war.name || Object.keys(patch).length > 0;
+  const dirty = Object.keys(patch).length > 0;
   const save = async () => {
     setBusy(true);
     try {
       let w = war;
-      if (name.trim() && name.trim() !== war.name) w = await api.patchWar(war.id, { name: name.trim() });
       if (Object.keys(patch).length) w = await api.action(war.id, { action: "evo_settings", settings: patch });
       onSaved(w);
       onClose();
@@ -74,10 +72,6 @@ export function EvolvedSettingsDialog({ war, settings, onClose, onSaved }: { war
       <button className="btn" onClick={onClose}>{t("cancel")}</button>
       <button className="btn play" disabled={busy || !dirty} onClick={save}>{t("save")}</button>
     </>}>
-      <label className="field">
-        <span className="field-label">{t("warName")}</span>
-        <input maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
       <EvolvedSettingsForm value={value} onChange={setValue} />
     </Modal>
   );

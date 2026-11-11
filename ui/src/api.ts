@@ -6,7 +6,7 @@ export interface Api {
   info(): Promise<Info>;
   createWar(body: { name: string; model: "vanilla" | "evolved"; settings?: Partial<Settings>; evolved?: Partial<EvoSettings> }): Promise<War>;
   getWar(id: string): Promise<War>;
-  patchWar(id: string, body: { name?: string; settings?: Partial<Settings> }): Promise<War>;
+  patchWar(id: string, body: { name?: string; description?: string; logo?: string | null; settings?: Partial<Settings> }): Promise<War>;
   deleteWar(id: string): Promise<void>;
   action(id: string, body: GmAction): Promise<War>;
   feed(id: string, after?: number, limit?: number): Promise<FeedEntry[]>;

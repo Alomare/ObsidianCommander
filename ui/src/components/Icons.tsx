@@ -17,6 +17,8 @@ export const IPlus = (p: P) => <svg {...base(p)}><path d="M12 5v14M5 12h14" /></
 export const ICheck = (p: P) => <svg {...base(p)}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
 export const IImport = (p: P) => <svg {...base(p)}><path d="M12 3.5V15M7.5 10.5L12 15l4.5-4.5" /><path d="M4 13.5v7h16v-7" /></svg>;
 export const IExport = (p: P) => <svg {...base(p)}><path d="M12 15V3.5M7.5 8L12 3.5 16.5 8" /><path d="M4 13.5v7h16v-7" /></svg>;
+/** A pencil: edit the war info. */
+export const IEdit = (p: P) => <svg {...base(p)}><path d="M4 20h4L19.5 8.5l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg>;
 export const ITrash = (p: P) => <svg {...base(p)}><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5" /></svg>;
 /** The Obsidian cog, so Settings looks the same in both. */
 export const IGear = (p: P) => (

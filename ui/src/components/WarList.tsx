@@ -5,15 +5,18 @@ import { playModel, selectWar, useHost } from "../bridge";
 import { t, tk } from "../strings";
 import type { FrontBrief, Info, WarSummary } from "../types";
 import { enemyName, FACTION_OF } from "../util";
-import { EvoMiniMap, MiniMap } from "../map/MiniMap";
+import { MiniMap } from "../map/MiniMap";
 import { FACTION_ACCENT, HELLDIVER_ACCENT } from "../map/GalaxyMap";
-import { EnemyIcon, ICheck, IChevron, IImport, ILan, IPlus, IUsers } from "./Icons";
+import { EnemyIcon, ICheck, IChevron, IEdit, IImport, ILan, IPlus, IUsers } from "./Icons";
+import { WarInfoDialog, WarLogo } from "./WarInfo";
 import { notify } from "./ui";
 
 export function WarList({ readOnly, onOpen, onCreate }: { readOnly: boolean; onOpen: (id: string) => void; onCreate: () => void }) {
   const host = useHost();
   const [info, setInfo] = useState<Info | null>(null);
   const [error, setError] = useState(false);
+  const [editing, setEditing] = useState<WarSummary | null>(null);
+  const [reload, setReload] = useState(0);
   const file = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,7 +33,7 @@ export function WarList({ readOnly, onOpen, onCreate }: { readOnly: boolean; onO
     };
     load();
     return () => { alive = false; clearTimeout(timer); };
-  }, []);
+  }, [reload]);
 
   const doImport = async (f: File) => {
     try {
@@ -68,13 +71,14 @@ export function WarList({ readOnly, onOpen, onCreate }: { readOnly: boolean; onO
       )}
 
       <div className="war-cards">
-        {wars.map((w, i) => <WarCard key={w.id} war={w} index={i} playing={host.playing === w.id} gameRunning={host.gameRunning} readOnly={readOnly} onOpen={() => onOpen(w.id)} />)}
+        {wars.map((w, i) => <WarCard key={w.id} war={w} index={i} playing={host.playing === w.id} gameRunning={host.gameRunning} readOnly={readOnly} onOpen={() => onOpen(w.id)} onEdit={() => setEditing(w)} />)}
       </div>
+      {editing && <WarInfoDialog war={editing} onClose={() => setEditing(null)} onSaved={() => setReload((n) => n + 1)} />}
     </div>
   );
 }
 
-function WarCard({ war, index, playing, gameRunning, readOnly, onOpen }: { war: WarSummary; index: number; playing: boolean; gameRunning: boolean; readOnly: boolean; onOpen: () => void }) {
+function WarCard({ war, index, playing, gameRunning, readOnly, onOpen, onEdit }: { war: WarSummary; index: number; playing: boolean; gameRunning: boolean; readOnly: boolean; onOpen: () => void; onEdit: () => void }) {
   const members = Array.isArray(war.members) ? war.members.length : war.members;
   const evolved = war.model === "evolved";
   // An Evolved war keeps the Vanilla fronts as they started; they say nothing about it.
@@ -87,11 +91,12 @@ function WarCard({ war, index, playing, gameRunning, readOnly, onOpen }: { war: 
   return (
     <div className={`war-card${playing ? " playing" : ""}`} style={{ animationDelay: `${index * 50}ms` }} role="button" tabIndex={0} aria-label={t("openWar", { name: war.name })}
       onClick={onOpen} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}>
-      {evolved ? <EvoMiniMap owners={war.evolved?.owners} /> : <MiniMap fronts={war.fronts} />}
+      <WarLogo war={war} />
       <div className="wc-body">
         <div className="wc-name">
           <span className="nm-text">{war.name}</span>
         </div>
+        {war.description && <p className="wc-desc">{war.description}</p>}
         <div className="wc-chips">
           {war.model && war.model !== "vanilla" && <span className="chip model">{evolved ? t("modelEvolvedShort") : war.model}</span>}
           {war.season != null && <span className="chip" data-tip={t("seasonTip")}>{t("seasonN", { n: war.season })}</span>}
@@ -112,6 +117,7 @@ function WarCard({ war, index, playing, gameRunning, readOnly, onOpen }: { war: 
         )}
       </div>
       <div className="wc-actions" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        {!readOnly && <button className="btn small" onClick={onEdit} data-tip={t("editInfoTip")}><IEdit />{t("editShort")}</button>}
         {!readOnly && (playing
           ? <button className="btn small selected-btn" disabled data-tip={t("playingTip")}><ICheck />{t("playingShort")}</button>
           : <button className="btn small" disabled={gameRunning} onClick={() => selectWar(war.id, war.name, model)} data-tip={busy ?? t("selectTip")}>{t("select")}</button>)}

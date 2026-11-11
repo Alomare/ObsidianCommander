@@ -76,8 +76,15 @@ export interface Settings {
 export interface War {
   id: string;
   name: string;
+  /** What the war is about; empty when the host gave none. */
+  description?: string;
+  /** A data: address of the war picture; empty for the picture of the model. */
+  logo?: string;
   model: string;
+  /** Counted from 1. */
   season: number;
+  /** The season the game gets: far above the official ones and apart for every war. */
+  game_season?: number;
   created: number;
   state: WarState;
   war_time: number;
@@ -203,6 +210,8 @@ export interface Evolved {
 export interface WarSummary {
   id: string;
   name: string;
+  description?: string;
+  logo?: string;
   model?: string;
   season?: number;
   state?: WarState;

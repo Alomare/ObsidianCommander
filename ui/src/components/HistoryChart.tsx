@@ -48,7 +48,7 @@ export function HistoryChart({ war, history, nowUnix }: { war: War; history: Sna
     return all.filter((s) => s.time >= from);
   }, [history, war, nowUnix, range]);
 
-  const H = 176, L = 30, R = 8, T = 10, B = 22;
+  const H = 180, L = 38, R = 8, T = 10, B = 26;
   const iw = Math.max(10, w - L - R), ih = H - T - B;
   const t0 = points[0]?.time ?? nowUnix - 3600;
   const t1 = Math.max(t0 + 60, points[points.length - 1]?.time ?? nowUnix);

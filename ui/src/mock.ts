@@ -38,7 +38,7 @@ function snap(m: MockWar, at = now()) {
 
 function newWar(name: string, s: Settings, id?: string): MockWar {
   const war: War = {
-    id: id ?? Math.random().toString(36).slice(2, 8), name, model: "vanilla", season: 1000 + Math.floor(Math.random() * 8999),
+    id: id ?? Math.random().toString(36).slice(2, 8), name, description: "", logo: "", model: "vanilla", season: 1,
     created: Math.floor(now()), state: "running", war_time: 0, speed: 1,
     fronts: [0, 1, 2].map((e) => makeFront(e as Enemy, s.start_points, s)),
     defend_event: null, attack_events: [],
@@ -423,7 +423,8 @@ function seedEvolved() {
   const m = newEvolvedWar("Second Galactic War", { ...EVO_DEFAULTS, ...fx.settings }, "uzreeg");
   const e = evo(m);
   const t = now();
-  m.war.season = 2948;
+  m.war.season = 2;
+  m.war.description = "The HELLDIVERS 2 galaxy, after the fall of the first Galactic War. Liberate the sectors around Super Earth, then push into enemy space.";
   m.war.war_time = 5 * 3600 + 1210;
   e.campaigns = copy(fx.campaigns);
   e.orders = copy(fx.orders);
@@ -437,7 +438,8 @@ function seedEvolved() {
 function seedWars() {
   const s = DEFAULT_SETTINGS;
   const a = newWar("Autumn Offensive", s, "k3x9q2");
-  a.war.season = 1042;
+  a.war.season = 4;
+  a.war.description = "Three fronts at full pressure. Defenses every few hours, played on Friday nights.";
   a.war.war_time = 3 * 86400 + 4231;
   const target = [36500, 14200, 64800];
   // Three days of hourly history, a random walk that ends where the fronts are now.
@@ -454,7 +456,7 @@ function seedWars() {
     pts[71] = end;
     return pts;
   });
-  for (let i = 0; i < 72; i++) a.history.push({ time: Math.floor(start + i * 3600), season: 1042, data: walk.map((w) => ({ points: Math.round(w[i]), points_taken: 0, status: "active" })) });
+  for (let i = 0; i < 72; i++) a.history.push({ time: Math.floor(start + i * 3600), season: 4, data: walk.map((w) => ({ points: Math.round(w[i]), points_taken: 0, status: "active" })) });
   a.war.fronts = target.map((p, e) => makeFront(e as Enemy, p, s));
   a.war.members = NAMES.slice(0, 5).map((n, i) => ({ player: playerId(i), name: i === 3 ? null : n, first_seen: Math.floor(start + i * 9000), last_seen: Math.floor(now() - i * 4000 - 60), missions: 30 - i * 5 }));
   a.war.statistics = [
@@ -487,7 +489,7 @@ function seedWars() {
 
   const b = newWar("LAN Night", { ...s, points_max: 30000, start_points: 3000, pressure_per_hour: 300 }, "p7m2wd");
   b.war.state = "paused";
-  b.war.season = 3317;
+  b.war.season = 1;
   b.war.lan = { open: true, port: 17494 };
   b.war.fronts[2].status = "hidden";
   setPoints(b, b.war.fronts[0], 21000, null);
@@ -496,7 +498,7 @@ function seedWars() {
 
   const c = newWar("Training Ground", s, "r8c1fa");
   c.war.state = "won";
-  c.war.season = 5120;
+  c.war.season = 2;
   c.war.fronts.forEach((f) => { f.status = "defeated"; f.points = f.points_max; f.region = 10; });
 
   seedEvolved();
@@ -567,6 +569,8 @@ export const mockApi: Api = {
   patchWar: async (id, b) => {
     const m = get(id);
     if (b.name) m.war.name = b.name;
+    if (b.description != null) m.war.description = b.description.trim();
+    if (b.logo !== undefined) m.war.logo = b.logo ?? "";
     if (b.settings) {
       m.war.settings = { ...m.war.settings, ...b.settings };
       m.war.fronts.forEach((f) => { f.points_max = m.war.settings.points_max; f.pressure_per_hour = m.war.settings.pressure_per_hour; f.region = regionOf(f.points, f.points_max); });

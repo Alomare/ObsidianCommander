@@ -121,14 +121,13 @@ export function Tile({ label, value, sub, tip }: { label: string; value: string;
 }
 
 export function SettingsDialog({ war, onClose, onSaved }: { war: War; onClose: () => void; onSaved: (w: War) => void }) {
-  const [name, setName] = useState(war.name);
   const [settings, setSettings] = useState<Settings>(war.settings);
   const [busy, setBusy] = useState(false);
-  const dirty = name !== war.name || JSON.stringify(settings) !== JSON.stringify(war.settings);
+  const dirty = JSON.stringify(settings) !== JSON.stringify(war.settings);
   const save = async () => {
     setBusy(true);
     try {
-      const w = await api.patchWar(war.id, { name: name.trim() || war.name, settings: sanitize(settings) });
+      const w = await api.patchWar(war.id, { settings: sanitize(settings) });
       onSaved(w);
       onClose();
     } catch (e) {
@@ -141,10 +140,6 @@ export function SettingsDialog({ war, onClose, onSaved }: { war: War; onClose: (
       <button className="btn" onClick={onClose}>{t("cancel")}</button>
       <button className="btn play" disabled={busy || !dirty} onClick={save}>{t("save")}</button>
     </>}>
-      <label className="field">
-        <span className="field-label">{t("warName")}</span>
-        <input maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
       <SettingsForm value={settings} onChange={setSettings} />
     </Modal>
   );

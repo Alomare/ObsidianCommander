@@ -6,8 +6,9 @@ import { PRESETS, presetOf, sanitize, type PresetId } from "../settings";
 import { t, tk } from "../strings";
 import type { EvoSettings, Settings } from "../types";
 import { hoursText, num } from "../util";
-import { EvoMiniMap, MiniMap } from "../map/MiniMap";
-import { IBack, IChevron, IPlus } from "./Icons";
+import { warCreated } from "../bridge";
+import { IBack, IChevron, IInfo, IPlus } from "./Icons";
+import { modelLogo } from "./WarInfo";
 import { EvolvedSettingsForm } from "./EvolvedSettings";
 import { SettingsForm } from "./SettingsForm";
 import { notify } from "./ui";
@@ -32,6 +33,8 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
       const w = model === "evolved"
         ? await api.createWar({ name: name.trim() || t("warNamePh"), model: "evolved", evolved: sanitizeEvo(evo) })
         : await api.createWar({ name: name.trim() || t("warNamePh"), model: "vanilla", settings: sanitize(settings) });
+      // Obsidian installs and enables the Evolved War Engine mod for an Evolved war.
+      warCreated(w.id, w.name, model === "evolved" ? "evolved" : undefined);
       onCreated(w.id);
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e), true);
@@ -58,15 +61,22 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
             <span className="field-label">{t("model")}</span>
             <div className="model-cards" role="radiogroup" aria-label={t("model")}>
               <button type="button" role="radio" className={`model-card${model === "vanilla" ? " on" : ""}`} aria-checked={model === "vanilla"} onClick={() => setModel("vanilla")}>
-                <MiniMap fronts={[0, 1, 2].map((e) => ({ enemy: e as 0, points: settings.start_points, points_max: settings.points_max, points_taken: 0, status: "active", introduction_order: e, region: 0 }))} />
+                <span className="mc-logo vanilla"><img src={modelLogo("vanilla")} alt="" draggable={false} /></span>
                 <span className="mc-text"><b className="cap">{t("modelVanilla")}</b><small>{t("modelVanillaText")}</small></span>
               </button>
               <button type="button" role="radio" className={`model-card${model === "evolved" ? " on" : ""}`} aria-checked={model === "evolved"} onClick={() => setModel("evolved")}>
-                <EvoMiniMap />
+                <span className="mc-logo evolved"><img src={modelLogo("evolved")} alt="" draggable={false} /></span>
                 <span className="mc-text"><b className="cap">{t("modelEvolved")}</b><small>{t("modelEvolvedText")}</small></span>
               </button>
             </div>
           </div>
+
+          {model === "evolved" && (
+            <div className="info-box" role="note">
+              <IInfo />
+              <span><b>{t("evolvedModTitle")}</b>{t("evolvedModText")}</span>
+            </div>
+          )}
 
           {model === "vanilla" && (
             <div className="field">

@@ -108,6 +108,11 @@ export function selectWar(war: string, name: string, model?: PlayModel) {
   post({ type: "commander:select", war, name, ...(model ? { model } : {}) });
   if (isMock && !embedded) set({ playing: war });
 }
+/** A war was made here. For an Evolved war, Obsidian installs the Evolved War Engine mod and enables
+    it in the active profile; older launchers ignore the message. */
+export function warCreated(war: string, name: string, model?: PlayModel) {
+  post({ type: "commander:created", war, name, ...(model ? { model } : {}) });
+}
 export function officialWar() {
   post({ type: "commander:official" });
   if (isMock && !embedded) set({ playing: null, gameRunning: false });
