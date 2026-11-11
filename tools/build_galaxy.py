@@ -189,12 +189,23 @@ def convex_pieces(ring):
     def inside(p, a, b, c):
         return cross(a, b, p) >= -1e-12 and cross(b, c, p) >= -1e-12 and cross(c, a, p) >= -1e-12
 
+    def min_angle(a, b, c):
+        out = math.pi
+        for p, q, r in ((a, b, c), (b, c, a), (c, a, b)):
+            u, v = (q[0] - p[0], q[1] - p[1]), (r[0] - p[0], r[1] - p[1])
+            lu, lv = math.hypot(*u), math.hypot(*v)
+            if lu == 0 or lv == 0:
+                return 0
+            out = min(out, math.acos(max(-1, min(1, (u[0] * v[0] + u[1] * v[1]) / (lu * lv)))))
+        return out
+
+    # Of the ears that can go, the best shaped goes first: no fans of slivers from one corner, so the
+    # merge below finds wide pieces.
     idx = list(range(n))
     tris = []
-    guard = 0
-    while len(idx) > 3 and guard < 10000:
-        guard += 1
+    while len(idx) > 3:
         m = len(idx)
+        best, best_q = None, -1.0
         for k in range(m):
             i0, i1, i2 = idx[(k - 1) % m], idx[k], idx[(k + 1) % m]
             a, b, c = ring[i0], ring[i1], ring[i2]
@@ -202,11 +213,13 @@ def convex_pieces(ring):
                 continue
             if any(inside(ring[j], a, b, c) for j in idx if j not in (i0, i1, i2)):
                 continue
-            tris.append([i0, i1, i2])
-            idx.pop(k)
-            break
-        else:
+            q = min_angle(a, b, c)
+            if q > best_q:
+                best, best_q = k, q
+        if best is None:
             sys.exit("sectors.svg: a sector outline can't be cut into triangles")
+        tris.append([idx[(best - 1) % m], idx[best], idx[(best + 1) % m]])
+        idx.pop(best)
     tris.append(idx[:])
 
     def convex(poly):
