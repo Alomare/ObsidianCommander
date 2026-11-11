@@ -106,7 +106,7 @@ pub fn discovery_loop(app: &Arc<App>) {
                     .map(|s| {
                         let w = &s.war;
                         serde_json::to_vec(&json!({"commander": 1, "war": w.id, "name": w.name, "model": w.model,
-                            "season": w.season, "port": port, "host": host, "players": w.recent_players(now),
+                            "season": w.shown_season(), "port": port, "host": host, "players": w.recent_players(now),
                             "version": VERSION}))
                         .unwrap_or_default()
                     })

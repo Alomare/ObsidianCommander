@@ -133,10 +133,16 @@ fn feed(slot: &WarSlot, req: &Req) -> Value {
 
 fn history(slot: &WarSlot, req: &Req) -> Value {
     let from = req.query.get("from").and_then(|s| s.parse::<i64>().ok());
-    let snaps: Vec<_> = slot
+    // The war screens count seasons from 1, as the war view does.
+    let snaps: Vec<Value> = slot
         .history
         .iter()
         .filter(|s| from.is_none_or(|f| s.time >= f))
+        .map(|s| {
+            let mut v = json!(s);
+            v["season"] = json!(slot.war.shown(s.season));
+            v
+        })
         .collect();
     json!({"snapshots": snaps})
 }
@@ -153,6 +159,63 @@ fn clean_name(v: Option<&Value>) -> Result<Option<String>, Resp> {
             }
         }
         Some(_) => Err(Resp::error(400, "`name` must be a string")),
+    }
+}
+
+/// The longest description, in characters.
+pub const DESCRIPTION_MAX: usize = 600;
+/// The longest logo address, in bytes: a small picture the war screens shrink before sending.
+pub const LOGO_MAX: usize = 200_000;
+
+/// A description: any text up to `DESCRIPTION_MAX` characters, trimmed; null or "" clears it.
+fn clean_description(v: Option<&Value>) -> Result<Option<String>, Resp> {
+    match v {
+        None => Ok(None),
+        Some(Value::Null) => Ok(Some(String::new())),
+        Some(Value::String(s)) => {
+            let s = s.trim();
+            if s.chars().count() > DESCRIPTION_MAX {
+                Err(Resp::error(
+                    400,
+                    &format!("`description` must have at most {DESCRIPTION_MAX} characters"),
+                ))
+            } else {
+                Ok(Some(s.to_string()))
+            }
+        }
+        Some(_) => Err(Resp::error(400, "`description` must be a string")),
+    }
+}
+
+/// A logo: a base64 PNG, JPEG or WebP `data:` address up to `LOGO_MAX` bytes; null or "" clears it.
+fn clean_logo(v: Option<&Value>) -> Result<Option<String>, Resp> {
+    let s = match v {
+        None => return Ok(None),
+        Some(Value::Null) => return Ok(Some(String::new())),
+        Some(Value::String(s)) => s.trim(),
+        Some(_) => return Err(Resp::error(400, "`logo` must be a string")),
+    };
+    if s.is_empty() {
+        return Ok(Some(String::new()));
+    }
+    if s.len() > LOGO_MAX {
+        return Err(Resp::error(400, "`logo` is too large"));
+    }
+    let data = ["image/png", "image/jpeg", "image/webp"]
+        .iter()
+        .find_map(|m| s.strip_prefix(&format!("data:{m};base64,")));
+    match data {
+        Some(d)
+            if !d.is_empty()
+                && d.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b)) =>
+        {
+            Ok(Some(s.to_string()))
+        }
+        _ => Err(Resp::error(
+            400,
+            "`logo` must be a base64 PNG, JPEG or WebP data address",
+        )),
     }
 }
 
@@ -184,12 +247,23 @@ fn create(app: &App, req: &Req) -> Resp {
         Err(r) => return r,
     };
     for k in body.keys() {
-        if !matches!(k.as_str(), "name" | "model" | "settings" | "evolved") {
+        if !matches!(
+            k.as_str(),
+            "name" | "description" | "logo" | "model" | "settings" | "evolved"
+        ) {
             return Resp::error(400, &format!("unknown field `{k}`"));
         }
     }
     let name = match clean_name(body.get("name")) {
         Ok(n) => n.unwrap_or_else(|| "Galactic War".into()),
+        Err(r) => return r,
+    };
+    let description = match clean_description(body.get("description")) {
+        Ok(d) => d.unwrap_or_default(),
+        Err(r) => return r,
+    };
+    let logo = match clean_logo(body.get("logo")) {
+        Ok(l) => l.unwrap_or_default(),
         Err(r) => return r,
     };
     let evolved = match body.get("model") {
@@ -217,7 +291,7 @@ fn create(app: &App, req: &Req) -> Resp {
     let now = now_unix();
     let mut wars = app.wars();
     let id = new_id(app, &wars);
-    let (war, out) = {
+    let (mut war, out) = {
         let mut dice = app.dice.lock().unwrap_or_else(|e| e.into_inner());
         if evolved {
             War::new_evolved(&id, &name, settings, evo_settings, now, &mut *dice)
@@ -225,6 +299,8 @@ fn create(app: &App, req: &Req) -> Resp {
             War::new(&id, &name, settings, now, &mut *dice)
         }
     };
+    war.description = description;
+    war.logo = logo;
     let mut slot = WarSlot::new(war, &app.wars_dir());
     if let Err(e) = slot.commit(out, now) {
         return Resp::error(500, &format!("could not write the war: {e}"));
@@ -287,15 +363,23 @@ fn patch(app: &App, req: &Req, id: &str) -> Resp {
         Err(r) => return r,
     };
     for k in body.keys() {
-        if !matches!(k.as_str(), "name" | "settings") {
+        if !matches!(k.as_str(), "name" | "description" | "logo" | "settings") {
             return Resp::error(
                 400,
-                &format!("only `name` and `settings` can change, not `{k}`"),
+                &format!("only `name`, `description`, `logo` and `settings` can change, not `{k}`"),
             );
         }
     }
     let name = match clean_name(body.get("name")) {
         Ok(n) => n,
+        Err(r) => return r,
+    };
+    let description = match clean_description(body.get("description")) {
+        Ok(d) => d,
+        Err(r) => return r,
+    };
+    let logo = match clean_logo(body.get("logo")) {
+        Ok(l) => l,
         Err(r) => return r,
     };
     let patch = match settings_patch(body.get("settings")) {
@@ -314,6 +398,14 @@ fn patch(app: &App, req: &Req, id: &str) -> Resp {
     let mut out = Out::default();
     if let Some(n) = name {
         slot.war.name = n;
+        out.changed = true;
+    }
+    if let Some(d) = description {
+        slot.war.description = d;
+        out.changed = true;
+    }
+    if let Some(l) = logo {
+        slot.war.logo = l;
         out.changed = true;
     }
     if let Some(s) = settings {
@@ -623,7 +715,9 @@ fn evolved_action(
                 .get("owner")
                 .and_then(Value::as_u64)
                 .filter(|o| *o <= 3)
-                .ok_or("`owner` must be 0 (Super Earth), 1 (bugs), 2 (cyborgs) or 3 (illuminates)")?;
+                .ok_or(
+                    "`owner` must be 0 (Super Earth), 1 (bugs), 2 (cyborgs) or 3 (illuminates)",
+                )?;
             e.set_owner(p, owner as u8, war_time, now, out)
         }
         "evo_campaign" => {
@@ -641,7 +735,9 @@ fn evolved_action(
                 Some(_) => return Err("`kind` must be \"liberation\" or \"defense\"".into()),
             };
             match kind {
-                CampaignKind::Liberation => e.start_liberation(p, war_time, now, dice, out).map(|_| ()),
+                CampaignKind::Liberation => {
+                    e.start_liberation(p, war_time, now, dice, out).map(|_| ())
+                }
                 CampaignKind::Defense => {
                     let faction = b
                         .get("faction")
@@ -655,13 +751,20 @@ fn evolved_action(
                             .filter(|h| (0.25..=720.0).contains(h))
                             .ok_or("`hours` must be between 0.25 and 720")?,
                     };
-                    e.start_defense(p, faction as u8, hours, war_time, now, dice, out).map(|_| ())
+                    e.start_defense(p, faction as u8, hours, war_time, now, dice, out)
+                        .map(|_| ())
                 }
             }
         }
         "evo_end_campaign" => {
-            let id = b.get("campaign").and_then(Value::as_u64).ok_or("`campaign` must be a campaign id")?;
-            let won = b.get("won").and_then(Value::as_bool).ok_or("`won` must be true or false")?;
+            let id = b
+                .get("campaign")
+                .and_then(Value::as_u64)
+                .ok_or("`campaign` must be a campaign id")?;
+            let won = b
+                .get("won")
+                .and_then(Value::as_bool)
+                .ok_or("`won` must be true or false")?;
             e.end_campaign(id, won, war_time, now, out)
         }
         "evo_order" => {
@@ -676,7 +779,11 @@ fn evolved_action(
                 Some(Value::Array(a)) => {
                     let mut v = vec![];
                     for x in a {
-                        let p = x.as_u64().map(|p| p as usize).filter(|p| *p < n).ok_or("`planets` must list planet numbers")?;
+                        let p = x
+                            .as_u64()
+                            .map(|p| p as usize)
+                            .filter(|p| *p < n)
+                            .ok_or("`planets` must list planet numbers")?;
                         if !v.contains(&p) {
                             v.push(p);
                         }
@@ -685,14 +792,27 @@ fn evolved_action(
                 }
                 Some(_) => return Err("`planets` must be a list".into()),
             };
-            let faction = b.get("faction").and_then(Value::as_u64).filter(|f| *f <= 3).unwrap_or(0) as u8;
+            let faction = b
+                .get("faction")
+                .and_then(Value::as_u64)
+                .filter(|f| *f <= 3)
+                .unwrap_or(0) as u8;
             let target = b.get("target").and_then(Value::as_f64).unwrap_or(0.0);
-            let hours = b.get("hours").and_then(Value::as_f64).unwrap_or(e.settings.order_hours);
+            let hours = b
+                .get("hours")
+                .and_then(Value::as_f64)
+                .unwrap_or(e.settings.order_hours);
             let brief = b.get("brief").and_then(Value::as_str).map(str::to_string);
-            e.issue_order(kind, planets, faction, target, hours, brief, "gm", war_time, now, out).map(|_| ())
+            e.issue_order(
+                kind, planets, faction, target, hours, brief, "gm", war_time, now, out,
+            )
+            .map(|_| ())
         }
         "evo_cancel_order" => {
-            let id = b.get("order").and_then(Value::as_u64).ok_or("`order` must be an order id")?;
+            let id = b
+                .get("order")
+                .and_then(Value::as_u64)
+                .ok_or("`order` must be an order id")?;
             e.cancel_order(id, war_time, now, out)
         }
         "evo_news" => {
@@ -706,7 +826,10 @@ fn evolved_action(
             Ok(())
         }
         "evo_settings" => {
-            let patch = b.get("settings").and_then(Value::as_object).ok_or("`settings` must be an object")?;
+            let patch = b
+                .get("settings")
+                .and_then(Value::as_object)
+                .ok_or("`settings` must be an object")?;
             e.settings = e.settings.patched(patch)?;
             out.changed = true;
             Ok(())

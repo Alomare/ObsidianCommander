@@ -377,8 +377,22 @@ pub struct PastSeason {
 pub struct War {
     pub id: String,
     pub name: String,
+    /// What the war is about, in the words of the host. Empty when none was given.
+    #[serde(default)]
+    pub description: String,
+    /// A small picture for the war list, as a `data:image/...;base64,` address. Empty for the
+    /// picture of the model.
+    #[serde(default)]
+    pub logo: String,
     pub model: String,
+    /// The season the game sees. It stays far above the official seasons and apart for every war,
+    /// since the game puts players of one season in one matchmaking pool. People see
+    /// `shown_season`, which counts from 1.
     pub season: i64,
+    /// The game season of the first season. Older wars have none and count back from the past
+    /// seasons they keep.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_season: Option<i64>,
     pub created: i64,
     pub state: WarState,
     pub war_time: f64,
@@ -511,8 +525,11 @@ impl War {
         let war = War {
             id: id.to_string(),
             name: name.to_string(),
+            description: String::new(),
+            logo: String::new(),
             model: "vanilla".into(),
             season,
+            first_season: Some(season),
             created: now,
             state: WarState::Running,
             war_time: 0.0,
@@ -537,8 +554,21 @@ impl War {
             changed: true,
             ..Default::default()
         };
-        out.push(Feed::new("season", "season_started").value(season as f64));
+        out.push(Feed::new("season", "season_started").value(1.0));
         (war, out)
+    }
+
+    /// The season number people see for a game season: the first season of the war is 1.
+    pub fn shown(&self, game_season: i64) -> i64 {
+        let first = self
+            .first_season
+            .unwrap_or(self.season - self.past_seasons.len() as i64);
+        game_season - first + 1
+    }
+
+    /// The season number people see now.
+    pub fn shown_season(&self) -> i64 {
+        self.shown(self.season)
     }
 
     /// A new Evolved war: the HELLDIVERS 2 galaxy with campaigns, operations and Major Orders.
@@ -1054,7 +1084,7 @@ impl War {
         out.push(
             Feed::new("season", if won { "season_won" } else { "season_lost" })
                 .player(who)
-                .value(self.season as f64),
+                .value(self.shown_season() as f64),
         );
         out.snapshot = true;
     }
@@ -1093,7 +1123,7 @@ impl War {
         out.push(
             Feed::new("season", "season_started")
                 .player(GM)
-                .value(self.season as f64),
+                .value(self.shown_season() as f64),
         );
         out.snapshot = true;
     }
@@ -1541,7 +1571,8 @@ impl War {
             .map(|m| json!({"player": m.player, "name": m.name, "first_seen": m.first_seen, "last_seen": m.last_seen, "missions": m.missions}))
             .collect();
         json!({
-            "id": self.id, "name": self.name, "model": self.model, "season": self.season, "created": self.created,
+            "id": self.id, "name": self.name, "description": self.description, "logo": self.logo,
+            "model": self.model, "season": self.shown_season(), "game_season": self.season, "created": self.created,
             "state": self.state.as_str(), "war_time": self.war_time, "speed": self.speed,
             "fronts": fronts,
             "defend_event": active_defend,
@@ -1550,7 +1581,7 @@ impl War {
             "statistics": self.statistics_rows(now),
             "members": members,
             "settings": self.settings,
-            "past_seasons": self.past_seasons.iter().map(|p| json!({"season": p.season, "result": p.result, "ended": p.ended})).collect::<Vec<_>>(),
+            "past_seasons": self.past_seasons.iter().map(|p| json!({"season": self.shown(p.season), "result": p.result, "ended": p.ended})).collect::<Vec<_>>(),
             "evolved": self.evolved.as_ref().map(|e| e.view(self.war_time, self.speed)),
             "lan": {"open": lan_open, "port": if lan_open { lan_port } else { None }},
             "server_time": now,
@@ -1559,7 +1590,8 @@ impl War {
 
     pub fn summary(&self, now: i64, lan_open: bool) -> Value {
         json!({
-            "id": self.id, "name": self.name, "model": self.model, "season": self.season, "state": self.state.as_str(),
+            "id": self.id, "name": self.name, "description": self.description, "logo": self.logo,
+            "model": self.model, "season": self.shown_season(), "state": self.state.as_str(),
             "war_time": self.war_time, "created": self.created, "lan": lan_open,
             "players": self.recent_players(now), "members": self.members.len(),
             "fronts": self.fronts.iter().map(|f| json!({"enemy": f.enemy, "region": f.region(), "status": f.status.as_str()})).collect::<Vec<_>>(),
@@ -1603,7 +1635,16 @@ mod tests {
 
     #[test]
     fn a_new_war_starts_mid_region_so_pressure_doesnt_cross_an_edge_at_once() {
-        let (mut w, _) = War::new("test02", "Test", Settings { director: false, ..Default::default() }, NOW, &mut Fixed(0.5));
+        let (mut w, _) = War::new(
+            "test02",
+            "Test",
+            Settings {
+                director: false,
+                ..Default::default()
+            },
+            NOW,
+            &mut Fixed(0.5),
+        );
         assert_eq!(w.fronts[0].points_int(), 15_000);
         let out = run(&mut w, 600.0);
         assert_eq!(w.fronts[0].region(), 2);
@@ -1829,6 +1870,43 @@ mod tests {
         assert_eq!(w.fronts[0].points_int(), 10_000);
         assert!(w.attack_events.is_empty());
         assert_eq!(w.past_seasons[0].result, "won");
+    }
+
+    #[test]
+    fn people_see_seasons_from_one_and_the_game_its_own() {
+        let mut w = war();
+        let game = w.season;
+        assert!(
+            game >= 1000,
+            "the game season stays apart from the official ones"
+        );
+        assert_eq!(w.shown_season(), 1);
+        let mut out = Out::default();
+        w.new_season(NOW, &mut out);
+        w.new_season(NOW, &mut out);
+        assert_eq!(w.season, game + 2);
+        assert_eq!(w.shown_season(), 3);
+        assert_eq!(w.shown(w.past_seasons[0].season), 1);
+        let started: Vec<f64> = out
+            .feed
+            .iter()
+            .filter(|f| f.text_key == "season_started")
+            .filter_map(|f| f.value)
+            .collect();
+        assert_eq!(started, [2.0, 3.0], "the feed counts as people do");
+        // A war from before first_season counts back from the seasons it keeps.
+        w.first_season = None;
+        assert_eq!(w.shown_season(), 3);
+        let old: War = serde_json::from_value({
+            let mut v = serde_json::to_value(&w).unwrap();
+            v.as_object_mut().unwrap().remove("first_season");
+            v.as_object_mut().unwrap().remove("description");
+            v.as_object_mut().unwrap().remove("logo");
+            v
+        })
+        .unwrap();
+        assert_eq!(old.shown_season(), 3);
+        assert_eq!(old.description, "");
     }
 
     #[test]

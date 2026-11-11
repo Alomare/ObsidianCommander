@@ -146,7 +146,7 @@ fn game_api_answers_like_the_official_server() {
     let h = start(&data, &ui);
     let war = create_war(h.port, json!({"director": false}));
     let id = war["id"].as_str().unwrap().to_string();
-    let season = war["season"].as_i64().unwrap();
+    let season = war["game_season"].as_i64().unwrap();
 
     // get_campaign_status: the full shape.
     let s = game(
@@ -415,7 +415,10 @@ fn game_api_answers_like_the_official_server() {
         .iter()
         .map(|m| m["player"].as_str().unwrap())
         .collect();
-    assert!(!members.contains(&"local") && members.contains(&PLAYER), "only identified players are members");
+    assert!(
+        !members.contains(&"local") && members.contains(&PLAYER),
+        "only identified players are members"
+    );
 
     // An unknown war is a 404.
     let r = http(
@@ -521,6 +524,49 @@ fn admin_api_token_settings_actions_feed() {
     assert_eq!(w["name"], "Renamed");
     assert_eq!(w["settings"]["planet_value"], 400.0);
 
+    // A new war starts at season 1; the game gets a separate season number.
+    assert_eq!(w["season"], 1);
+    assert!((1000..=9999).contains(&w["game_season"].as_i64().unwrap()));
+    assert_eq!(w["description"], "");
+    assert_eq!(w["logo"], "");
+
+    // Description and logo: checked, kept, cleared.
+    let logo = "data:image/png;base64,iVBORw0KGgo=";
+    for bad in [
+        json!({"description": 5}),
+        json!({"description": "x".repeat(601)}),
+        json!({"logo": "https://example.com/a.png"}),
+        json!({"logo": "data:image/svg+xml;base64,PHN2Zz4="}),
+        json!({"logo": "data:image/png;base64,<script>"}),
+        json!({"logo": format!("data:image/png;base64,{}", "A".repeat(200_001))}),
+    ] {
+        let r = admin(p, "PATCH", &format!("/api/wars/{id}"), Some(bad.clone()));
+        assert_eq!(r.status, 400, "{bad}");
+    }
+    let w = admin(
+        p,
+        "PATCH",
+        &format!("/api/wars/{id}"),
+        Some(json!({"description": "  The long night.  ", "logo": logo})),
+    )
+    .json();
+    assert_eq!(w["description"], "The long night.");
+    assert_eq!(w["logo"], logo);
+    assert_eq!(w["name"], "Renamed", "fields left out stay");
+    let listed = admin(p, "GET", "/api/info", None).json();
+    assert_eq!(listed["wars"][0]["description"], "The long night.");
+    assert_eq!(listed["wars"][0]["logo"], logo);
+    assert_eq!(listed["wars"][0]["season"], 1);
+    let w = admin(
+        p,
+        "PATCH",
+        &format!("/api/wars/{id}"),
+        Some(json!({"logo": null, "description": ""})),
+    )
+    .json();
+    assert_eq!(w["logo"], "");
+    assert_eq!(w["description"], "");
+
     let act = |body: Value| admin(p, "POST", &format!("/api/wars/{id}/actions"), Some(body));
     assert_eq!(
         act(json!({"action": "push", "front": 1, "regions": 3})).json()["fronts"][1]["region"],
@@ -566,8 +612,11 @@ fn admin_api_token_settings_actions_feed() {
         "won"
     );
     let season = w["season"].as_i64().unwrap();
+    let game_season = w["game_season"].as_i64().unwrap();
     let w = act(json!({"action": "new_season"})).json();
     assert_eq!(w["season"], season + 1);
+    assert_eq!(w["game_season"], game_season + 1);
+    assert_eq!(w["past_seasons"][0]["season"], 1);
     assert_eq!(w["state"], "running");
     assert_eq!(w["fronts"][0]["points"], 15000);
     assert_eq!(act(json!({"action": "dance"})).status, 400);
@@ -852,7 +901,13 @@ fn evolved_war_through_the_mod_routes() {
     assert_eq!(s["owners"].as_array().unwrap().len(), 273);
     assert_eq!(s["war"]["id"], id.as_str());
     let campaigns = s["campaigns"].as_array().unwrap();
-    assert_eq!(campaigns.iter().filter(|c| c["kind"] == "liberation").count(), 2);
+    assert_eq!(
+        campaigns
+            .iter()
+            .filter(|c| c["kind"] == "liberation")
+            .count(),
+        2
+    );
     let c = &campaigns[0];
     let op = &c["operations"][0];
 
@@ -864,7 +919,10 @@ fn evolved_war_through_the_mod_routes() {
         h.port,
         "POST",
         &format!("/w/{id}/evolved/report"),
-        &[("Content-Type", "application/json"), ("X-Commander-Player", PLAYER)],
+        &[
+            ("Content-Type", "application/json"),
+            ("X-Commander-Player", PLAYER),
+        ],
         body.as_bytes(),
     )
     .json();
@@ -874,39 +932,90 @@ fn evolved_war_through_the_mod_routes() {
         h.port,
         "POST",
         &format!("/w/{id}/evolved/report"),
-        &[("Content-Type", "application/json"), ("X-Commander-Player", PLAYER)],
+        &[
+            ("Content-Type", "application/json"),
+            ("X-Commander-Player", PLAYER),
+        ],
         body.as_bytes(),
     )
     .json();
     assert_eq!(again["credited"], false);
-    let bad = http(h.port, "POST", &format!("/w/{id}/evolved/report"), &[], b"{\"campaign\": 1}");
+    let bad = http(
+        h.port,
+        "POST",
+        &format!("/w/{id}/evolved/report"),
+        &[],
+        b"{\"campaign\": 1}",
+    );
     assert_eq!(bad.status, 400);
 
     // The game polls still answer, and the stock uploads move nothing in an Evolved war.
-    let st = game(h.port, &id, Some(PLAYER), &[("action", "get_campaign_status")]);
+    let st = game(
+        h.port,
+        &id,
+        Some(PLAYER),
+        &[("action", "get_campaign_status")],
+    );
     assert_eq!(st["error_code"], 0);
 
     // The GM: a dispatch, a defense, an order.
-    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_news", "text": "Hold the line."})));
+    let r = admin(
+        h.port,
+        "POST",
+        &format!("/api/wars/{id}/actions"),
+        Some(json!({"action": "evo_news", "text": "Hold the line."})),
+    );
     assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
-    assert!(r.json()["evolved"]["news"].as_array().unwrap().iter().any(|n| n["text"] == "Hold the line."));
-    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_campaign", "planet": 0, "kind": "defense", "faction": 2, "hours": 2})));
+    assert!(
+        r.json()["evolved"]["news"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|n| n["text"] == "Hold the line.")
+    );
+    let r = admin(
+        h.port,
+        "POST",
+        &format!("/api/wars/{id}/actions"),
+        Some(
+            json!({"action": "evo_campaign", "planet": 0, "kind": "defense", "faction": 2, "hours": 2}),
+        ),
+    );
     assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
-    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_order", "kind": "defend", "planets": [0], "hours": 5})));
+    let r = admin(
+        h.port,
+        "POST",
+        &format!("/api/wars/{id}/actions"),
+        Some(json!({"action": "evo_order", "kind": "defend", "planets": [0], "hours": 5})),
+    );
     assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
-    let r = admin(h.port, "POST", &format!("/api/wars/{id}/actions"), Some(json!({"action": "evo_planet", "planet": 9999, "owner": 1})));
+    let r = admin(
+        h.port,
+        "POST",
+        &format!("/api/wars/{id}/actions"),
+        Some(json!({"action": "evo_planet", "planet": 9999, "owner": 1})),
+    );
     assert_eq!(r.status, 400);
 
     // A Vanilla war has no Evolved routes.
     let v = admin(h.port, "POST", "/api/wars", Some(json!({"name": "Plain"}))).json();
     let vid = v["id"].as_str().unwrap();
-    assert_eq!(http(h.port, "GET", &format!("/w/{vid}/evolved/state"), &[], b"").status, 404);
+    assert_eq!(
+        http(h.port, "GET", &format!("/w/{vid}/evolved/state"), &[], b"").status,
+        404
+    );
 
     // Saved and loaded back whole.
     h.shutdown();
     let h = start(&data, &ui);
     let s2 = http(h.port, "GET", &format!("/w/{id}/evolved/state"), &[], b"").json();
     assert_eq!(s2["owners"], s["owners"]);
-    assert!(s2["campaigns"].as_array().unwrap().iter().any(|c| c["kind"] == "defense"));
+    assert!(
+        s2["campaigns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["kind"] == "defense")
+    );
     h.shutdown();
 }

@@ -218,7 +218,7 @@ fn evolved_route(app: &Arc<App>, req: &Req, via: Via, id: &str, what: &str) -> R
                 return Resp::not_found();
             };
             let mut v = e.view(w.war_time, w.speed);
-            v["war"] = json!({"id": w.id, "name": w.name, "season": w.season, "state": w.state.as_str(),
+            v["war"] = json!({"id": w.id, "name": w.name, "season": w.shown_season(), "state": w.state.as_str(),
                               "war_time": w.war_time, "speed": w.speed, "server_time": now});
             Resp::json(200, &v)
         }
@@ -240,7 +240,8 @@ fn evolved_route(app: &Arc<App>, req: &Req, via: Via, id: &str, what: &str) -> R
                 };
                 e.report(&player, &report, war_time, now, &mut *dice, &mut out)
             };
-            slot.war.touch_member(&player, name.as_deref(), now, &mut out);
+            slot.war
+                .touch_member(&player, name.as_deref(), now, &mut out);
             app.log.line(&format!(
                 "war {id}: evolved report from {player} campaign {} operation {} mission {} success {} -> {}",
                 report.campaign, report.operation, report.mission, report.success, answer

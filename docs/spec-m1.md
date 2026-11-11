@@ -50,7 +50,7 @@ Everything else answers 404 on the LAN listener. The listener closes when no war
 While a war is open to LAN, the server sends a UDP broadcast to `255.255.255.255:17493` every 3 seconds:
 
 ```json
-{"commander": 1, "war": "<id>", "name": "...", "model": "vanilla", "season": 1042,
+{"commander": 1, "war": "<id>", "name": "...", "model": "vanilla", "season": 1,
  "port": 17494, "host": "<computer name>", "players": 3, "version": "0.1.0"}
 ```
 
@@ -94,7 +94,7 @@ A Vanilla war copies the shape of the HD1 Galactic Campaign with custom rules, s
 
 **Fronts.** Three fronts, `enemy` 0 bugs, 1 cyborgs, 2 illuminates. `points` from 0 to `points_max` (default 100000). The region of a front is `clamp(floor(points / (points_max / 10)) + 1, 1, 10)`, as the game computes it. Region 1 touches Super Earth, region 10 touches the enemy home world. `status` is `active`, `defeated` or `hidden`. `introduction_order` 0, 1, 2 (a war may start with fronts `hidden` and introduce them later).
 
-**Start.** Each active front starts at `start_points` (default 15000, the middle of region 2, so enemy pressure doesn't cross a region edge at once). The season number is 1000 + a random number up to 8999, fixed at creation.
+**Start.** Each active front starts at `start_points` (default 15000, the middle of region 2, so enemy pressure doesn't cross a region edge at once). The game season is 1000 + a random number up to 8999, fixed at creation, so every war has a separate matchmaking pool. People see the season counted from 1: `season` in the admin API, the LAN announcement and the feed is that number, and `game_season` is the one the game gets.
 
 **Clock.** The war advances in real time while the server runs and the clock isn't paused. While the server is closed, no time passes: on start, the server resumes from where it stopped (it stores `war_time`, the seconds the war has run, and advances it by the real seconds between ticks, capped at 60 per tick). Speed multiplier: 1 (settings allow 0.5 to 10). The tick runs every 5 seconds.
 
@@ -121,9 +121,9 @@ JSON over HTTP on the loopback listener. Every call needs the admin token, excep
 | Call | Does |
 |---|---|
 | `GET /api/info` | `{version, protocol, wars: [summary]}` |
-| `POST /api/wars` | create: `{name, model: "vanilla", settings?}`. Answers the war |
+| `POST /api/wars` | create: `{name, description?, logo?, model: "vanilla", settings?}`. Answers the war |
 | `GET /api/wars/<id>` | the full war (below) |
-| `PATCH /api/wars/<id>` | change `name` or any `settings` field |
+| `PATCH /api/wars/<id>` | change `name`, `description` (up to 600 characters), `logo` (a base64 PNG, JPEG or WebP `data:` address up to 200 kB; null or "" for the picture of the model) or any `settings` field |
 | `DELETE /api/wars/<id>` | delete the war folder |
 | `POST /api/wars/<id>/actions` | one GM action (below). Answers the war |
 | `GET /api/wars/<id>/feed?after=<id>&limit=<n>` | feed entries, newest last |
@@ -136,7 +136,7 @@ JSON over HTTP on the loopback listener. Every call needs the admin token, excep
 
 ```json
 {
-  "id": "k3x9q2", "name": "...", "model": "vanilla", "season": 1042, "created": 1794258000,
+  "id": "k3x9q2", "name": "...", "description": "...", "logo": "", "model": "vanilla", "season": 1, "game_season": 1042, "created": 1794258000,
   "state": "running | paused | won | lost",
   "war_time": 18234.5, "speed": 1,
   "fronts": [{"enemy": 0, "points": 23000, "points_max": 100000, "points_taken": 0, "status": "active",
