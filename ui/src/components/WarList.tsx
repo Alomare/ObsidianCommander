@@ -1,13 +1,13 @@
-// The wars on this server: open one, play one, create or import.
+// The wars on this server: open one, select one for Obsidian's Play button, create or import.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { api } from "../api";
-import { play, playModel, selectWar, useHost } from "../bridge";
+import { playModel, selectWar, useHost } from "../bridge";
 import { t, tk } from "../strings";
 import type { FrontBrief, Info, WarSummary } from "../types";
 import { enemyName, FACTION_OF } from "../util";
 import { EvoMiniMap, MiniMap } from "../map/MiniMap";
 import { FACTION_ACCENT, HELLDIVER_ACCENT } from "../map/GalaxyMap";
-import { EnemyIcon, ICheck, IChevron, IImport, ILan, IPlay, IPlus, IUsers } from "./Icons";
+import { EnemyIcon, ICheck, IChevron, IImport, ILan, IPlus, IUsers } from "./Icons";
 import { notify } from "./ui";
 
 export function WarList({ readOnly, onOpen, onCreate }: { readOnly: boolean; onOpen: (id: string) => void; onCreate: () => void }) {
@@ -112,7 +112,6 @@ function WarCard({ war, index, playing, gameRunning, readOnly, onOpen }: { war: 
         )}
       </div>
       <div className="wc-actions" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-        <button className="btn play" disabled={gameRunning} data-tip={busy ?? (playing ? t("playingTip") : t("playTip"))} onClick={() => play(war.id, war.name, model)}><IPlay />{t("play")}</button>
         {!readOnly && (playing
           ? <button className="btn small selected-btn" disabled data-tip={t("playingTip")}><ICheck />{t("playingShort")}</button>
           : <button className="btn small" disabled={gameRunning} onClick={() => selectWar(war.id, war.name, model)} data-tip={busy ?? t("selectTip")}>{t("select")}</button>)}

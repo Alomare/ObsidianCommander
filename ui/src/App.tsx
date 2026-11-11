@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { hasToken, isMock } from "./api";
+import { reportView, setHomeHandler } from "./bridge";
 import { Notices, TipLayer } from "./components/ui";
 import { WarList } from "./components/WarList";
 import { CreateWar } from "./components/CreateWar";
@@ -36,6 +37,14 @@ export function App() {
     history.pushState(null, "", location.pathname + location.search + h);
     setRoute(r);
   };
+
+  // Obsidian hears which screen shows, and the Commander tab there brings the war list back.
+  useEffect(() => { reportView(route.page); }, [route.page]);
+  useEffect(() => {
+    if (guestWar) return;
+    setHomeHandler(() => go({ page: "list" }));
+    return () => setHomeHandler(null);
+  });
 
   return (
     <div className="app">

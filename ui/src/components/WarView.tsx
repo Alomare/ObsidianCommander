@@ -1,7 +1,7 @@
 // The war: the galaxy overview as the hero, the fronts under it, the clock and tools above, the side panel.
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { api, isMock } from "../api";
-import { play, playModel, useHost } from "../bridge";
+import { playModel, selectWar, useHost } from "../bridge";
 import { useNow, useTween, useWarData } from "../hooks";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";
@@ -12,7 +12,7 @@ import { CommandPanel } from "./CommandPanel";
 import { EvolvedBody } from "./EvolvedView";
 import { EvolvedSettingsDialog } from "./EvolvedSettings";
 import { FeedList, PlayersPanel, SettingsDialog, StatsPanel } from "./Panels";
-import { EnemyIcon, IBack, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, ILan, IList, IMore, IPlay, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
+import { EnemyIcon, IBack, ICheck, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, ILan, IList, IMore, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
 import { Confirm, MenuButton, Seg, Switch, notify } from "./ui";
 
 type Tab = "command" | "feed" | "players" | "stats";
@@ -173,10 +173,9 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
           </div>
         )}
         <div className="play-wrap">
-          <button className={`btn play big${isPlaying ? " selected" : ""}`} disabled={host.gameRunning} onClick={() => play(war.id, war.name, playModel(war.model))} data-tip={playTip}>
-            <IPlay />{t("play")}
-          </button>
-          {isPlaying && <span className="play-note">{host.gameRunning ? t("gameRunning") : t("playing")}</span>}
+          {isPlaying
+            ? <button className="btn small selected-btn" disabled data-tip={playTip}><ICheck />{t("playingShort")}</button>
+            : <button className="btn small" disabled={host.gameRunning} onClick={() => selectWar(war.id, war.name, playModel(war.model))} data-tip={host.gameRunning ? t("gameRunningTip") : t("selectTip")}>{t("select")}</button>}
         </div>
       </header>
 

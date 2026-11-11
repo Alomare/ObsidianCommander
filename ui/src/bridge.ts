@@ -58,7 +58,20 @@ function onMessage(e: MessageEvent) {
     set(patch);
   } else if (d.type === "obsidian:state") {
     set(patch);
+  } else if (d.type === "obsidian:home") {
+    onHome?.();
   }
+}
+
+/** What runs when Obsidian asks for the war list: the Commander tab in Obsidian clicked while open. */
+let onHome: (() => void) | null = null;
+export function setHomeHandler(f: (() => void) | null) {
+  onHome = f;
+}
+
+/** Tells Obsidian which screen shows, so Obsidian keeps the row of buttons it draws under the war list only. */
+export function reportView(page: "list" | "create" | "war") {
+  post({ type: "commander:view", page });
 }
 
 function post(msg: Record<string, unknown>) {
