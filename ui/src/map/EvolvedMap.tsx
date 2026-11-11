@@ -5,10 +5,16 @@ import type { EvoCampaign, Evolved, War } from "../types";
 import { t } from "../strings";
 import { clock, enemySingle } from "../util";
 import { activeOrders, ownerName, pctText, secondsLeft } from "../evolved";
-import { BORDER_PATH, EDGE_PATH, LINKS, NEIGHBOURS, OWNER_KEYS, PLANETS, RIM, SECTORS, SECTOR_EDGES, ownerColor, sectorHolder } from "./galaxy";
+import { BORDER_PATH, EDGE_PATH, LINKS, NEIGHBOURS, OWNER_KEYS, PLANETS, RIM, SECTORS, SECTOR_EDGES, edgesPath, ownerColor, sectorHolder } from "./galaxy";
 
 const PAD_X = 125, PAD_Y = 22;
 const FULL = { x: -RIM - PAD_X, y: -RIM - PAD_Y, w: (RIM + PAD_X) * 2, h: (RIM + PAD_Y) * 2 };
+/** The deepest zoom: the view this many times narrower than the whole map. */
+const MAX_ZOOM = 10;
+/** Screen pixels per map unit from which the sector names show, and from which every planet is named. */
+const SECTOR_NAMES_PPU = 1.45, PLANET_NAMES_PPU = 3.6;
+/** Sector and planet name sizes on screen, in pixels, the same at any zoom. */
+const SECTOR_PX = 17, PLANET_PX = 12;
 /** Where each enemy name sits outside the rim: degrees counterclockwise from the right, and the text anchor. */
 const ENEMY_LABEL: Record<number, { deg: number; anchor: "start" | "end"; hang: boolean }> = {
   1: { deg: 28, anchor: "start", hang: false },
@@ -50,12 +56,14 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
   const ppu = Math.max(0.05, Math.min(size.w / view.w, size.h / view.h));
   /** A text size in map units: `base`, kept between `minPx` and `maxPx` on screen at any zoom. */
   const fs = (base: number, minPx: number, maxPx: number) => Math.min(maxPx / ppu, Math.max(base, minPx / ppu));
-  const sectorF = fs(11, 9.5, 12.5), nameF = fs(12, 11, 14), enemyF = Math.min(30, fs(24, 14, 22)), enemySubF = fs(13, 10, 13), seF = fs(12, 10, 14);
-  const dotR = Math.round(Math.min(7, Math.max(3, 2.3 / ppu)) * 10) / 10;
-  const markK = Math.min(2.4, Math.max(0.7, 10 / (12 * ppu)));
+  const nameF = fs(12, 11, 14), enemyF = Math.min(30, fs(24, 14, 22)), enemySubF = fs(13, 10, 13), seF = fs(12, 10, 14);
+  const sectorF = SECTOR_PX / ppu, planetF = PLANET_PX / ppu;
+  // Dots and marks grow with the zoom up to a set size on screen, then keep it.
+  const dotR = Math.round(Math.min(7, Math.max(3, 2.3 / ppu), 9 / ppu) * 100) / 100;
+  const markK = Math.min(2.4, Math.max(10 / (12 * ppu), Math.min(0.7, 2.2 / ppu)));
   const seR = Math.min(26, Math.max(15, 8 / ppu));
 
-  // Wheel zoom about the pointer, from the whole map down to a quarter of it.
+  // Wheel zoom about the pointer, from the whole map down to 1 / MAX_ZOOM of it.
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
@@ -64,7 +72,7 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
       const r = el.getBoundingClientRect();
       setView((v) => {
         const k = Math.exp(e.deltaY * 0.0015);
-        const w = Math.min(FULL.w, Math.max(FULL.w / 4, v.w * k));
+        const w = Math.min(FULL.w, Math.max(FULL.w / MAX_ZOOM, v.w * k));
         const s = Math.min(r.width / v.w, r.height / v.h);
         const ox = (r.width - v.w * s) / 2, oy = (r.height - v.h * s) / 2;
         const px = v.x + (e.clientX - r.left - ox) / s, py = v.y + (e.clientY - r.top - oy) / s;
@@ -125,14 +133,19 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
       else crossLinks += seg;
     }
     const holders = SECTORS.map((s) => sectorHolder(own, s));
-    let front = "";
-    for (const e of SECTOR_EDGES) if (holders[e.a].owner !== holders[e.b].owner) front += e.d;
+    const front = edgesPath(SECTOR_EDGES.filter((e) => holders[e.a].owner !== holders[e.b].owner).map((e) => e.edge));
     return (
       <g className="evo-territory">
         {SECTORS.map((s) => {
           const h = holders[s.id];
           return <path key={s.id} d={s.path} className="evo-sector" style={{ fill: ownerColor(h.owner, h.owner === 0 ? 0.05 : 0.07 + 0.18 * h.share) }} />;
         })}
+        {/* Sector names lie on the fill, under everything else; Sol is Super Earth and keeps the Super Earth label. */}
+        {ppu >= SECTOR_NAMES_PPU && (
+          <g className="evo-sectors" aria-hidden>
+            {SECTORS.filter((s) => s.id !== 0).map((s) => <text key={s.id} x={s.x} y={s.y} style={{ fontSize: sectorF }}>{s.name.toUpperCase()}</text>)}
+          </g>
+        )}
         <path className="evo-sector-borders" d={BORDER_PATH} />
         <path className="evo-galaxy-edge" d={EDGE_PATH} />
         <path className="evo-front-lines" d={front} />
@@ -149,7 +162,7 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
         </g>
       </g>
     );
-  }, [ownersKey, dotR, ppu]);
+  }, [ownersKey, dotR, ppu, sectorF]);
 
   const counts = useMemo(() => {
     const c = [0, 0, 0, 0];
@@ -158,6 +171,7 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
   }, [owners]);
 
   const orderPlanets = useMemo(() => new Set(activeOrders(evo).flatMap((o) => o.kind === "missions" ? [] : o.planets)), [evo]);
+  const campaignPlanets = useMemo(() => new Set(evo.campaigns.map((c) => c.planet)), [evo]);
   const vb = `${view.x} ${view.y} ${view.w} ${view.h}`;
   const sel = selected != null ? PLANETS[selected] : null;
   const hoverPlanet = hover ? PLANETS[hover.planet] : null;
@@ -194,10 +208,15 @@ export const EvolvedMap = memo(function EvolvedMap({ war, evo, selected, onSelec
         {territory}
         <circle r={RIM} className="evo-rim" />
 
-        {/* Sector names; Sol is Super Earth and keeps the Super Earth label. */}
-        <g className="evo-sectors" aria-hidden>
-          {SECTORS.filter((s) => s.id !== 0).map((s) => <text key={s.id} x={s.x} y={s.y} style={{ fontSize: sectorF }}>{s.name.toUpperCase()}</text>)}
-        </g>
+        {/* Close in, every planet in view is named; campaigns and home worlds carry their own labels. */}
+        {ppu >= PLANET_NAMES_PPU && (
+          <g className="evo-pnames" aria-hidden>
+            {PLANETS.filter((p) => p.id !== 0 && !p.home && !campaignPlanets.has(p.id) &&
+              p.x > view.x - 60 && p.x < view.x + view.w + 60 && p.y > view.y - 20 && p.y < view.y + view.h + 20).map((p) => (
+              <text key={p.id} x={p.x} y={p.y + dotR + planetF * 1.05} style={{ fontSize: planetF }}>{p.name.toUpperCase()}</text>
+            ))}
+          </g>
+        )}
 
         {/* The planets of the order being written, and the selected planet. */}
         {picks && (

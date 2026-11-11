@@ -86,16 +86,17 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     return () => ro.disconnect();
   }, []);
   const ppu = Math.max(0.05, Math.min(size.w / view.w, size.h / view.h));
-  /** A font size in map units: `base` at full size, never under `minPx` on screen, never over `max`. */
-  const fs = (base: number, minPx: number, max: number) => Math.min(max, Math.max(base, minPx / ppu));
-  const nameF = fs(24, 12.5, 46), subF = fs(16, 10.5, 34), numF = fs(19, 10.5, 34), frontF = fs(23, 13, 40), seF = fs(16, 10.5, 30);
-  const markK = Math.min(3.2, Math.max(1.5, 10.5 / (12 * ppu)));
+  /** A font size in map units: `base` at full size, never under `minPx` on screen, never over `max`
+   *  units or `maxPx` on screen, so the text keeps a set size when the map is zoomed in close. */
+  const fs = (base: number, minPx: number, max: number, maxPx: number) => Math.min(max, maxPx / ppu, Math.max(base, minPx / ppu));
+  const nameF = fs(24, 12.5, 46, 26), subF = fs(16, 10.5, 34, 18), numF = fs(19, 10.5, 34, 24), frontF = fs(23, 13, 40, 30), seF = fs(16, 10.5, 30, 20);
+  const markK = Math.min(3.2, Math.max(10.5 / (12 * ppu), Math.min(1.5, 2.6 / ppu)));
   // Home world labels: top fronts write outward from the ring, the bottom front inward, so both lines
   // stack the same way at any font size.
   const rSubTop = OUTER_R + 8, rNameTop = rSubTop + subF * 1.17;
   const rNameBottom = OUTER_R + 8 + nameF * 0.72, rSubBottom = rNameBottom + subF * 1.17;
 
-  // Wheel zoom about the pointer, from the whole map down to a third of it.
+  // Wheel zoom about the pointer, from the whole map down to a quarter of it.
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
@@ -104,7 +105,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
       const r = el.getBoundingClientRect();
       setView((v) => {
         const k = Math.exp(e.deltaY * 0.0015);
-        const w = Math.min(FULL.w, Math.max(FULL.w / 3, v.w * k));
+        const w = Math.min(FULL.w, Math.max(FULL.w / 4, v.w * k));
         const s = Math.min(r.width / v.w, r.height / v.h);
         const ox = (r.width - v.w * s) / 2, oy = (r.height - v.h * s) / 2;
         const px = v.x + (e.clientX - r.left - ox) / s, py = v.y + (e.clientY - r.top - oy) / s;

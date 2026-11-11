@@ -167,7 +167,7 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 /* Panels with folded corners. An outline or an accent bar on one must close across the folds: put
    var(--edge-corners) first in the background and set --edge (both folds) or --edge-tl / --edge-br, with
    --edge-tl-w / --edge-br-w for a bar wider than the 1px outline. */
-.panel, .modal, .tip, .notice, .war-card, .event-card, .side, .front-card, .events-overlay, .map-tip, .season-result, .empty-card, .model-card, .preset-card, .menu, .evo-order, .dispatch-strip, .map-stage {
+.panel, .modal, .tip, .notice, .war-card, .event-card, .side, .front-card, .events-overlay, .map-tip, .season-result, .empty-card, .model-card, .preset-card, .menu, .evo-order, .map-stage {
   -webkit-mask: linear-gradient(135deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px)), linear-gradient(315deg, transparent var(--cut), #000 calc(var(--cut) + 0.5px));
   -webkit-mask-composite: source-in; mask-composite: intersect;
   --edge-corners:
@@ -366,7 +366,8 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 }
 
 /* The galaxy */
-.galaxy { position: absolute; inset: 0; }
+/* --map-label: planet names on both maps, plain white with a soft shadow. */
+.galaxy { position: absolute; inset: 0; --map-label: rgba(255, 255, 255, 0.9); --map-label-shadow: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.75)); }
 .stars { position: absolute; inset: 0; width: 100%; height: 100%; fill: #dfe8ff; pointer-events: none; }
 .stars .tw { animation: twinkle 3.2s ease-in-out infinite alternate; }
 @keyframes twinkle { to { opacity: 0.1; } }
@@ -406,10 +407,10 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .superearth.sel .se-ring { stroke: #fff; stroke-width: 2.4; stroke-dasharray: none; }
 .superearth.threat .se-ring { stroke: #ff7a5a; stroke-dasharray: 6 4; animation-duration: 12s; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.se-label { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.3em; text-anchor: middle; fill: rgba(220, 238, 255, 0.85); pointer-events: none; paint-order: stroke; stroke: rgba(0, 0, 0, 0.6); stroke-width: 3px; }
+.se-label { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.3em; text-anchor: middle; fill: var(--map-label); pointer-events: none; filter: var(--map-label-shadow); }
 
 .hw-labels text { text-anchor: middle; pointer-events: none; }
-.hw-name { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.24em; fill: var(--map-tx); paint-order: stroke; stroke: rgba(0, 0, 0, 0.6); stroke-width: 4px; }
+.hw-name { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.24em; fill: var(--map-label); filter: var(--map-label-shadow); }
 .hw-sub { font-family: "Saira Variable", sans-serif; font-weight: 650; letter-spacing: 0.16em; fill: var(--map-mu); paint-order: stroke; stroke: rgba(0, 0, 0, 0.6); stroke-width: 3px; }
 .hw.dim text { opacity: 0.4; }
 
@@ -641,7 +642,10 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
    Lines keep one screen width at any zoom. */
 .evo-sector { pointer-events: none; transition: fill 600ms ease; }
 .galaxy.picking .evo-planet, .galaxy.picking .evo-mark, .galaxy.picking .evo-se { cursor: copy; }
-.evo-sector-borders { fill: none; stroke: rgba(205, 220, 245, 0.3); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
+/* --evo-line: the sector outlines, and the sector names in the same colour. */
+.galaxy.evo { --evo-line: rgba(205, 220, 245, 0.3); }
+.evo-sector-borders, .evo-galaxy-edge, .evo-front-lines { stroke-linejoin: round; stroke-linecap: round; }
+.evo-sector-borders { fill: none; stroke: var(--evo-line); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
 .evo-galaxy-edge { fill: none; stroke: rgba(205, 220, 245, 0.45); stroke-width: 1.2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .evo-front-lines { fill: none; stroke: rgba(255, 255, 255, 0.62); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
 .evo-links { fill: none; stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
@@ -652,10 +656,10 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .evo-dot.home { stroke-width: 4; }
 .evo-planet:hover .evo-dot { filter: brightness(1.35) drop-shadow(0 0 3px rgba(255, 255, 255, 0.7)); stroke: #fff; }
 .evo-rim { fill: none; stroke: rgba(255, 190, 70, 0.6); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; filter: drop-shadow(0 0 4px rgba(255, 170, 20, 0.45)); }
-.evo-sectors text { font-family: "Saira Variable", sans-serif; font-weight: 600; letter-spacing: 0.14em; text-anchor: middle; dominant-baseline: central; fill: rgba(225, 232, 245, 0.55); pointer-events: none;
-  paint-order: stroke; stroke: rgba(0, 0, 0, 0.75); stroke-width: 3px; stroke-linejoin: round; }
-.evo-homes text { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.18em; text-anchor: middle; fill: var(--map-tx); pointer-events: none;
-  paint-order: stroke; stroke: rgba(0, 0, 0, 0.75); stroke-width: 3px; stroke-linejoin: round; }
+.evo-sectors text { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.2em; text-anchor: middle; dominant-baseline: central; fill: var(--evo-line); pointer-events: none; }
+.evo-homes, .evo-pnames { filter: var(--map-label-shadow); }
+.evo-homes text { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.18em; text-anchor: middle; fill: var(--map-label); pointer-events: none; }
+.evo-pnames text { font-family: "Saira Variable", sans-serif; font-weight: 600; letter-spacing: 0.1em; text-anchor: middle; fill: var(--map-label); pointer-events: none; }
 .evo-picks circle { fill: rgba(240, 180, 41, 0.18); stroke: #f0b429; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .evo-sel-ring { fill: none; stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.7)); }
 .evo-se { cursor: pointer; }
@@ -673,8 +677,7 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .evo-mark-value { font-family: "Saira Variable", sans-serif; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; fill: #ffcf6e; pointer-events: none;
   paint-order: stroke; stroke: rgba(0, 0, 0, 0.85); stroke-width: 3px; stroke-linejoin: round; }
 .evo-mark.defense .evo-mark-value { fill: #ffb02e; }
-.evo-mark-name { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.12em; fill: #fff; pointer-events: none;
-  paint-order: stroke; stroke: rgba(0, 0, 0, 0.8); stroke-width: 3px; stroke-linejoin: round; }
+.evo-mark-name { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.12em; fill: var(--map-label); pointer-events: none; filter: var(--map-label-shadow); }
 .evo-enemy-name { font-family: "Saira Variable", sans-serif; font-weight: 700; letter-spacing: 0.18em; fill: var(--oc); paint-order: stroke; stroke: rgba(0, 0, 0, 0.6); stroke-width: 4px; }
 .evo-enemy-sub { font-family: "Saira Variable", sans-serif; font-weight: 600; letter-spacing: 0.14em; fill: var(--map-mu); }
 
@@ -711,15 +714,9 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .lg-mark.order { box-shadow: inset 0 0 0 1.5px #f0b429; transform: rotate(45deg) scale(0.85); }
 .evo-legend .lg-mark.front { width: 1.1rem; height: 0; border-top: 2px dashed rgba(255, 238, 205, 0.9); }
 
-/* Under the map: the newest dispatch. */
-.dispatch-strip { display: flex; align-items: center; gap: 0.9rem; min-width: 0; height: 2.6rem; padding: 0 0.9rem; border: 0; text-align: left; cursor: pointer; color: var(--tx);
-  --edge: transparent; --edge-tl: var(--gold); --edge-tl-w: 3px; --p-top: var(--p1);
-  background: var(--edge-corners), linear-gradient(160deg, var(--p-top), var(--p2)); background-origin: border-box; box-shadow: inset 3px 0 0 var(--gold); transition: background var(--fast); }
-.dispatch-strip:hover { --p-top: color-mix(in srgb, var(--p1) 88%, var(--tx)); }
-.dispatch-strip:focus-visible { outline-offset: -2px; }
-.dispatch-strip b { flex: none; font-size: 0.68rem; color: var(--goldtx); }
-.ds-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; }
-.ds-time { flex: none; font: 500 0.76rem "Saira Variable", sans-serif; color: var(--mu); }
+/* The Evolved map column holds the map alone, nothing under it. */
+.map-col.solo { grid-template-rows: minmax(0, 1fr); }
+@media (max-width: 900px) { .map-col.solo { grid-template-rows: 60vh; } }
 
 /* The side panel */
 .owner-chip { flex: none; font: 700 0.66rem "Saira Variable", sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.2rem 0.45rem; background: var(--oc); color: #0b0b0b; }

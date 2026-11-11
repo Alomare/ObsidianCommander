@@ -75,12 +75,23 @@ export const LINKS: [number, number][] = g.links;
 export const NEIGHBOURS: number[][] = PLANETS.map(() => []);
 for (const [a, b] of LINKS) { NEIGHBOURS[a].push(b); NEIGHBOURS[b].push(a); }
 
+/** Edges as one path: an edge that starts where the last one ended continues the line, so the
+ *  corners join instead of meeting as loose ends. The data lists the edges in such runs. */
+export function edgesPath(edges: number[][]): string {
+  let d = "", end = "";
+  for (const b of edges) {
+    const from = `${sx(b[0])} ${sy(b[1])}`, to = `${sx(b[2])} ${sy(b[3])}`;
+    d += (from === end ? "L" : `M${from}L`) + to;
+    end = to;
+  }
+  return d;
+}
 /** The sector borders, every edge once: between two sectors, and the outer edge of the galaxy. */
-const edge = (b: number[]) => `M${sx(b[0])} ${sy(b[1])}L${sx(b[2])} ${sy(b[3])}`;
-export const BORDER_PATH = g.borders.filter((b) => b[5] >= 0).map(edge).join("");
-export const EDGE_PATH = g.borders.filter((b) => b[5] < 0).map(edge).join("");
+const INNER = g.borders.filter((b) => b[5] >= 0);
+export const BORDER_PATH = edgesPath(INNER);
+export const EDGE_PATH = edgesPath(g.borders.filter((b) => b[5] < 0));
 /** The edges between two sectors, with the sectors on each side, for the front lines. */
-export const SECTOR_EDGES: { d: string; a: number; b: number }[] = g.borders.filter((b) => b[5] >= 0).map((b) => ({ d: edge(b), a: b[4], b: b[5] }));
+export const SECTOR_EDGES: { edge: number[]; a: number; b: number }[] = INNER.map((b) => ({ edge: b, a: b[4], b: b[5] }));
 
 /** Who holds a sector: the enemy with the most planets there (the first on a tie), or Super Earth when
  *  no enemy holds any; `share` is the part of the planets that enemy holds. */

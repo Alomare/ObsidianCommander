@@ -1,11 +1,11 @@
-// An Evolved war: the galaxy map with the Major Order and the campaigns over it, the latest dispatch
-// under it, and the side panel: the selected planet or the orders, the dispatches, players, statistics.
+// An Evolved war: the galaxy map with the Major Order and the campaigns over it, and the side panel:
+// the selected planet or the orders, the dispatches, players, statistics.
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { isMock } from "../api";
 import { useTween } from "../hooks";
 import { t, tk } from "../strings";
-import type { EvoCampaign, EvoNews, EvoOperation, EvoOrder, Evolved, GmAction, OrderKind, War } from "../types";
-import { ago, clock, dateTime, enemySingle, num, pct, timeOfDay } from "../util";
+import type { EvoCampaign, EvoOperation, EvoOrder, Evolved, GmAction, OrderKind, War } from "../types";
+import { clock, dateTime, enemySingle, num, pct, timeOfDay } from "../util";
 import { activeOrders, campaignOn, orderCount, orderShare, ownerName, pctText, secondsLeft, sortedCampaigns } from "../evolved";
 import { EvolvedMap } from "../map/EvolvedMap";
 import { NEIGHBOURS, PLANETS, PLANETS_BY_NAME, SECTORS, ownerColor, planetName } from "../map/galaxy";
@@ -69,7 +69,7 @@ export function EvolvedBody({ war, evo, readOnly, run, nowUnix, serverNow, tab, 
 
   return (
     <div className="war-body">
-      <div className="map-col">
+      <div className="map-col solo">
         <div className="map-stage">
           <EvolvedMap war={war} evo={evo} selected={planet} onSelect={select} picks={picking ? draft!.planets : null} onPick={pick} nowUnix={nowUnix} />
           <div className="status-col">
@@ -78,7 +78,6 @@ export function EvolvedBody({ war, evo, readOnly, run, nowUnix, serverNow, tab, 
           </div>
           <Legend />
         </div>
-        <DispatchStrip news={evo.news[0]} serverNow={serverNow} onOpen={() => setTab("feed")} />
       </div>
 
       <aside className="side">
@@ -153,16 +152,6 @@ function Legend() {
       <span><i className="lg-mark order" />{t("legendOrder")}</span>
       <span><i className="lg-mark front" />{t("legendFrontLine")}</span>
     </div>
-  );
-}
-
-function DispatchStrip({ news, serverNow, onOpen }: { news: EvoNews | undefined; serverNow: number; onOpen: () => void }) {
-  return (
-    <button className="dispatch-strip" onClick={onOpen} data-tip={t("latestDispatch")}>
-      <b className="cap">{t("dispatch")}</b>
-      <span className="ds-text">{news ? news.text : t("noNews")}</span>
-      {news && <span className="ds-time">{ago(news.time, serverNow)}</span>}
-    </button>
   );
 }
 
