@@ -93,15 +93,15 @@ fn split_url(url: &str) -> (String, HashMap<String, String>) {
     (path.to_string(), query)
 }
 
-/// Whether the LAN listener answers `ip`: loopback, the private and link-local ranges, and the
-/// ranges VPN tools hand out (100.64.0.0/10, 25.0.0.0/8). An address from the open internet gets
-/// nothing, so a forwarded port or a public network does not expose a war.
+/// Whether a caller of the network listener from `ip` counts as local: the private and link-local
+/// ranges, and the ranges VPN tools hand out (100.64.0.0/10, 25.0.0.0/8). Loopback does not: on the
+/// network listener a loopback caller comes through a tunnel program on this PC (playit.gg, ngrok),
+/// which carries callers from anywhere, while Obsidian on this PC uses the loopback listener.
 pub fn lan_source_ok(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
             let o = v4.octets();
-            v4.is_loopback()
-                || v4.is_private()
+            v4.is_private()
                 || v4.is_link_local()
                 || (o[0] == 100 && (64..128).contains(&o[1]))
                 || o[0] == 25
@@ -111,9 +111,40 @@ pub fn lan_source_ok(ip: IpAddr) -> bool {
                 return lan_source_ok(IpAddr::V4(v4));
             }
             let first = v6.segments()[0];
-            v6.is_loopback() || (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
+            (first & 0xfe00) == 0xfc00 || (first & 0xffc0) == 0xfe80
         }
     }
+}
+
+/// What a caller of the network listener from `source` reaches: the LAN wars when local, the
+/// wars open to the internet otherwise, and nothing (None) while no war is open to the internet.
+pub fn network_via(app: &App, source: Option<IpAddr>) -> Option<Via> {
+    if app.cfg.lan_any_source || source.is_some_and(lan_source_ok) {
+        return Some(Via::Lan);
+    }
+    app.wars()
+        .values()
+        .any(|s| s.reachable(Via::Internet))
+        .then_some(Via::Internet)
+}
+
+/// Whether a request may name this server `host`. A local name or an address always passes. On the
+/// network listener a public name passes too for the interface files, which hold nothing of any
+/// war, and for a request with the invite code of a war open to the internet, as one through a
+/// tunnel address carries. A page that a public site points at this server by DNS has no code.
+pub fn host_allowed(app: &App, listener: Via, host: Option<&str>, req: &Req) -> bool {
+    if host_ok(host) {
+        return true;
+    }
+    if listener == Via::Loopback {
+        return false;
+    }
+    let page = (req.method == "GET" || req.method == "HEAD")
+        && (req.path == "/" || req.path == "/index.html" || req.path.starts_with("/assets/"));
+    page || app
+        .wars()
+        .values()
+        .any(|s| s.admits(Via::Internet, req.key()))
 }
 
 /// Whether a `Host` header names this server the way a local caller does: an address, a name
@@ -141,26 +172,21 @@ fn refuse(raw: tiny_http::Request, status: u16, msg: &str) {
     let _ = raw.respond(tiny_http::Response::from_data(body).with_status_code(status));
 }
 
-fn handle(app: &Arc<App>, mut raw: tiny_http::Request, via: Via) {
-    let mut via = via;
-    if via == Via::Lan
-        && !app.cfg.lan_any_source
-        && !raw.remote_addr().is_some_and(|a| lan_source_ok(a.ip()))
-    {
-        // From outside the local network: only while some war is open to the internet.
-        if !app.wars().values().any(|s| s.reachable(Via::Internet)) {
-            return refuse(raw, 403, "local network only");
+fn handle(app: &Arc<App>, mut raw: tiny_http::Request, listener: Via) {
+    let via = if listener == Via::Loopback {
+        Via::Loopback
+    } else {
+        match network_via(app, raw.remote_addr().map(|a| a.ip())) {
+            Some(v) => v,
+            // From outside the local network: only while some war is open to the internet.
+            None => return refuse(raw, 403, "local network only"),
         }
-        via = Via::Internet;
-    }
+    };
     let host = raw
         .headers()
         .iter()
         .find(|h| h.field.equiv("Host"))
         .map(|h| h.value.as_str().to_string());
-    if !host_ok(host.as_deref()) {
-        return refuse(raw, 403, "unknown host name");
-    }
     let (path, query) = split_url(raw.url());
     let headers = raw
         .headers()
@@ -186,7 +212,9 @@ fn handle(app: &Arc<App>, mut raw: tiny_http::Request, via: Via) {
         headers,
         body,
     };
-    let resp = if too_big {
+    let resp = if !host_allowed(app, listener, host.as_deref(), &req) {
+        Resp::error(403, "unknown host name")
+    } else if too_big {
         Resp::error(413, "request too large")
     } else {
         route(app, &req, via)
@@ -449,7 +477,6 @@ mod tests {
     #[test]
     fn the_lan_listener_answers_local_addresses_only() {
         for ok in [
-            "127.0.0.1",
             "192.168.0.7",
             "10.1.2.3",
             "172.16.0.9",
@@ -458,14 +485,17 @@ mod tests {
             "100.64.0.1",
             "100.127.255.254",
             "25.1.2.3",
-            "::1",
             "fd12:3456::1",
             "fe80::1",
             "::ffff:192.168.1.5",
         ] {
             assert!(lan_source_ok(ok.parse().unwrap()), "{ok}");
         }
+        // Loopback on the network listener is a tunnel program on this PC: callers from anywhere.
         for no in [
+            "127.0.0.1",
+            "::1",
+            "::ffff:127.0.0.1",
             "8.8.8.8",
             "172.32.0.1",
             "100.128.0.1",

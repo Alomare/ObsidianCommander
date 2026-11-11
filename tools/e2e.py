@@ -173,15 +173,21 @@ def main():
         listen.settimeout(8)
         code, lan = admin(base, "POST", f"/api/wars/{wid}/lan", {"open": True})
         check("open to LAN", code == 200 and lan.get("open") and lan.get("port"), str(lan))
+        # Guests reach the war at the address the announcement came from, as Obsidian does. Loopback
+        # would count as a caller from outside (a tunnel program on the PC).
+        lan_ip = "127.0.0.1"
         try:
             data, src = listen.recvfrom(4096)
             pkt = json.loads(data)
             check("LAN announcement", pkt.get("commander") == 1 and pkt.get("war") == wid and pkt.get("port") == lan["port"], str(pkt))
+            lan_ip = src[0]
         except socket.timeout:
             check("LAN announcement", False, "nothing heard in 8 s")
         finally:
             listen.close()
-        lan_base = f"http://127.0.0.1:{lan['port']}"
+        code, _ = http("GET", f"http://127.0.0.1:{lan['port']}/api/wars/{wid}")
+        check("a loopback caller of the LAN listener counts as outside", code == 403, str(code))
+        lan_base = f"http://{lan_ip}:{lan['port']}"
         code, w = http("GET", f"{lan_base}/api/wars/{wid}")
         check("LAN guests read the war", code == 200, str(code))
         code, _ = http("POST", f"{lan_base}/api/wars/{wid}/actions", json.dumps({"action": "pause"}), {"Content-Type": "application/json", "X-Commander-Token": TOKEN})

@@ -23,10 +23,17 @@ fn temp_dir(tag: &str) -> PathBuf {
 }
 
 fn start(data: &Path, ui: &Path) -> Handle {
+    start_with(data, ui, true)
+}
+
+/// `any_source`: every caller of the network listener counts as local. The tests reach that listener
+/// from loopback, which otherwise counts as a caller from outside (a tunnel program on the PC).
+fn start_with(data: &Path, ui: &Path, any_source: bool) -> Handle {
     let mut cfg = Config::new(data.to_path_buf(), 0, TOKEN.into(), ui.to_path_buf());
     cfg.lan_port = 0;
     // Loopback, so Windows shows no firewall prompt for the test program.
     cfg.lan_bind = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+    cfg.lan_any_source = any_source;
     cfg.discovery_port = 0;
     cfg.tick_seconds = 0.0;
     commander::start(cfg).expect("server starts")
@@ -1047,6 +1054,101 @@ fn a_request_named_for_a_public_site_gets_nothing() {
     assert_eq!(ask("rebind.example.com"), 403);
     assert_eq!(ask(&format!("127.0.0.1:{}", h.port)), 200);
     assert_eq!(ask("localhost"), 200);
+    h.shutdown();
+}
+
+#[test]
+fn a_tunnel_caller_counts_as_outside_and_a_tunnel_name_passes_with_the_invite() {
+    use commander::http::{Via, network_via};
+    let (data, ui) = (temp_dir("tunnel"), temp_dir("tunnel-ui"));
+    std::fs::write(ui.join("index.html"), "<!doctype html>").unwrap();
+    let h = start_with(&data, &ui, false);
+    let war = create_war(h.port, json!({}))["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let lan = |body: Value| admin(h.port, "POST", &format!("/api/wars/{war}/lan"), Some(body));
+    // A raw request to the network listener from loopback, as a tunnel program on the PC sends it.
+    let ask = |method: &str, path: &str, host: &str, key: Option<&str>| {
+        let port = h.app.lan_port().expect("the network listener is open");
+        let mut s = TcpStream::connect(("127.0.0.1", port)).expect("connect");
+        let key = key
+            .map(|k| format!("X-Commander-Key: {k}\r\n"))
+            .unwrap_or_default();
+        let body = if method == "POST" {
+            "action=get_campaign_status"
+        } else {
+            ""
+        };
+        write!(
+            s,
+            "{method} {path} HTTP/1.1\r\nHost: {host}\r\n{key}X-Commander-Player: {PLAYER}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+        .unwrap();
+        let mut raw = String::new();
+        s.read_to_string(&mut raw).unwrap();
+        raw.split(' ').nth(1).unwrap().parse::<u16>().unwrap()
+    };
+    let game = format!("/w/{war}/1.0/");
+    let view = format!("/api/wars/{war}");
+
+    assert_eq!(
+        network_via(&h.app, Some("127.0.0.1".parse().unwrap())),
+        None,
+        "nothing open to the internet yet"
+    );
+    assert_eq!(
+        network_via(&h.app, Some("192.168.0.7".parse().unwrap())),
+        Some(Via::Lan)
+    );
+
+    // Open to LAN alone: a loopback caller of the network listener is outside, and gets nothing.
+    assert_eq!(lan(json!({"open": true})).status, 200);
+    assert_eq!(ask("GET", &view, "127.0.0.1", None), 403);
+    assert_eq!(ask("POST", &game, "127.0.0.1", None), 403);
+
+    // Open to the internet: the code is needed, by address or by tunnel name.
+    let code = lan(json!({"open": true, "internet": true})).json()["invite"]
+        .as_str()
+        .expect("an invite code")
+        .to_string();
+    assert_eq!(
+        network_via(&h.app, Some("127.0.0.1".parse().unwrap())),
+        Some(Via::Internet)
+    );
+    assert_eq!(ask("GET", &view, "127.0.0.1", None), 404);
+    assert_eq!(ask("GET", &view, "127.0.0.1", Some(&code)), 200);
+    let tunnel = "abc.at.example-tunnel.gg:12345";
+    assert_eq!(ask("POST", &game, tunnel, Some(&code)), 200);
+    assert_eq!(ask("GET", &view, tunnel, Some(&code)), 200);
+    assert_eq!(
+        ask("POST", &game, tunnel, None),
+        403,
+        "a public name without the code"
+    );
+    assert_eq!(ask("POST", &game, tunnel, Some("AAAAA-AAAAA")), 403);
+    // The interface files hold nothing of a war and load by the tunnel name too.
+    assert_eq!(ask("GET", "/", tunnel, None), 200);
+    assert_eq!(ask("GET", "/assets/none.js", tunnel, None), 404);
+    // The admin listener stays strict about names, code or not.
+    let mut s = TcpStream::connect(("127.0.0.1", h.port)).expect("connect");
+    write!(
+        s,
+        "GET /api/info?token={TOKEN} HTTP/1.1\r\nHost: {tunnel}\r\nX-Commander-Key: {code}\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    let mut raw = String::new();
+    s.read_to_string(&mut raw).unwrap();
+    assert_eq!(raw.split(' ').nth(1), Some("403"));
+
+    // A new code shuts the old one out on the tunnel name as well.
+    assert_eq!(
+        lan(json!({"open": true, "internet": true, "new_invite": true})).status,
+        200
+    );
+    assert_eq!(ask("POST", &game, tunnel, Some(&code)), 403);
+    lan(json!({"open": false}));
     h.shutdown();
 }
 
