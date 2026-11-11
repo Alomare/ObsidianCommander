@@ -156,6 +156,11 @@ def run(step):
         x, y = (float(n) for n in rest.split(","))
         sx, sy = design(x, y) if verb[0] == "d" else to_screen(x, y)
         user32.SetCursorPos(sx, sy)
+        time.sleep(0.05)
+        # A move the game sees as input: a nudge and back, in case its cursor follows only mouse events.
+        user32.mouse_event(1, 2, 2, 0, 0)
+        time.sleep(0.05)
+        user32.mouse_event(1, -2, -2, 0, 0)
         time.sleep(0.2)
         if verb in ("click", "dclick"):
             user32.mouse_event(2, 0, 0, 0, 0)

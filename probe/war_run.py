@@ -43,6 +43,7 @@ SAVES = [Path(os.environ["APPDATA"]) / "Arrowhead/Helldivers/saves", Path(r"C:\P
 OBS = None
 OBS_REPO = None
 EVOLVED = False
+METHODS = False
 EVO_BUILDS = REPO.parent.parent / "Mods" / "EvolvedWarEngine" / "internal" / "builds"
 
 
@@ -211,10 +212,56 @@ def play_evolved(out, base, token, wid, war):
     if not war_line:
         sys.exit("no war line in settings.txt")
     CFG.write_text(f"url={war_line.split(chr(9))[2]}\nisolate_save=0\nblock_telemetry=0\nno_tutorial=1\n")
-    log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:900", f"wait:POLL season={war['season']}:240", "sleep:12", "cmd:state", "shot:ship")
+    log = drive(out, "launch", "wait:PROBE ready:300", "wait:STATE menu:300", f"wait:POLL season={war['season']}:240", "sleep:12", "cmd:state", "shot:ship")
     if "TIMEOUT" in log or "GAME GONE" in log:
+        drive(out, "shot:stuck")
         print("stopped early")
         return
+    if METHODS:
+        methods_check(out, war_line)
+    tour(out, base, token, wid)
+    final = admin(base, token, "GET", f"/api/wars/{wid}")
+    (out / "war.json").write_text(json.dumps(final, indent=1))
+
+
+def tour(out, base, token, wid):
+    """Every level of the Evolved map in the game: the galaxy, a sector under the pointer, then keys down
+    to an operation, back up, and a mouse click into the same sector."""
+    drive(out, "cmd:menu campaign", "sleep:9", "shot:t1-galaxy")
+    log = (LOGS / "alomareevolvedwar.log").read_text(errors="replace") if (LOGS / "alomareevolvedwar.log").exists() else ""
+    screens = [l for l in log.splitlines() if " screen l=" in l]
+    if not screens:
+        print("no screen line in the mod log; the tour stops")
+        drive(out, "cmd:close")
+        return
+    ext = dict(kv.split("=") for kv in screens[-1].split("screen ", 1)[1].split())
+    l, b, r, t = (float(ext[k]) for k in ("l", "b", "r", "t"))
+    print("mod screen", l, b, r, t)
+    galaxy = json.loads((REPO / "data" / "galaxy-hd2.json").read_text(encoding="utf-8"))
+    state = admin(base, token, "GET", f"/api/wars/{wid}")
+    camps = (state.get("evolved") or {}).get("campaigns") or []
+    pid = camps[0]["planet"] if camps else 0
+    p = galaxy["planets"][pid]
+    h = t - b
+    gx, gy, gs = (l + r) / 2, b + h * 0.465, h * 0.41
+
+    def design(mx, my):
+        # drive.py dmove takes the mod frame (1920x1080, y down, at ui_scale 0.8).
+        fx, fy = gx + mx * gs, gy + my * gs
+        return f"{fx:.1f},{1080 - fy:.1f}"
+
+    # Just beside the campaign mark, inside the same sector.
+    target = design(p["x"] + 0.012, p["y"] - 0.012)
+    print("hover and click at", target, "planet", p["name"])
+    drive(out, f"dmove:{target}", "sleep:1.5", "shot:t2-hover")
+    drive(out, "key:D", "sleep:0.5", "key:E", "sleep:4", "shot:t3-sector")
+    drive(out, "key:D", "sleep:0.5", "key:E", "sleep:4", "shot:t4-planet")
+    drive(out, "key:D", "sleep:0.5", "key:E", "sleep:4", "shot:t5-operation")
+    drive(out, "key:Q", "sleep:1.5", "key:Q", "sleep:1.5", "key:Q", "sleep:3", "shot:t6-back")
+    drive(out, f"dclick:{target}", "sleep:4", "shot:t7-click-sector", "key:Q", "sleep:2", "cmd:close", "sleep:2")
+
+
+def methods_check(out, war_line):
     # What the game's Http sends for each method: a listener on this PC keeps method, path and body size.
     seen = []
 
@@ -242,9 +289,6 @@ def play_evolved(out, base, token, wid, war):
           f"cmd:httpm GET {relay_game}evolved/state", "sleep:3", f"cmd:httpm POST {relay_game}evolved/state", "sleep:3")
     print("listener saw:", seen)
     listener.shutdown()
-    drive(out, "cmd:menu campaign", "sleep:12", "shot:evolved-map", "sleep:4", "shot:evolved-map-later", "cmd:close", "sleep:3")
-    final = admin(base, token, "GET", f"/api/wars/{wid}")
-    (out / "war.json").write_text(json.dumps(final, indent=1))
 
 
 def end():
@@ -273,13 +317,15 @@ def end():
 
 
 def main():
-    global OBS, OBS_REPO, EVOLVED
+    global OBS, OBS_REPO, EVOLVED, METHODS
     ap = argparse.ArgumentParser()
     ap.add_argument("verb", choices=("all", "begin", "play", "end"))
     ap.add_argument("--obsidian", required=True)
     ap.add_argument("--evolved", action="store_true")
+    ap.add_argument("--methods", action="store_true", help="with --evolved: what the game Http sends for GET and POST")
     a = ap.parse_args()
     EVOLVED = a.evolved
+    METHODS = a.methods
     OBS_REPO = Path(a.obsidian)
     OBS = OBS_REPO / "target" / "debug" / "obsidian.exe"
     if not OBS.exists():
