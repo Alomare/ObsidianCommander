@@ -115,6 +115,10 @@ def main():
         code, war = admin(base, "POST", "/api/wars", {"name": "E2E Offensive", "model": "vanilla"})
         check("create war", code in (200, 201) and bool(war.get("id")), f"{code} {str(war)[:160]}")
         wid = war["id"]
+        # A new war starts paused; the host starts the clock.
+        check("new war paused", war.get("state") == "paused", war.get("state"))
+        code, war = admin(base, "POST", f"/api/wars/{wid}/actions", {"action": "resume"})
+        check("resume", code == 200 and war.get("state") == "running", f"{code} {war.get('state')}")
         # The game sends the game season; `season` in the admin view is the one people see, counted from 1.
         season = war.get("game_season", war["season"])
 
