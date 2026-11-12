@@ -85,6 +85,10 @@ pub struct Settings {
     pub attack_points: i64,
     pub attack_mission_value: f64,
     pub director: bool,
+    /// Players may only play the war on the Sandbox save made for it. Off: any Sandbox save plays it.
+    pub own_save_only: bool,
+    /// Steam achievements are not blocked while the war is played (the player guardrail still applies).
+    pub allow_achievements: bool,
 }
 
 impl Default for Settings {
@@ -104,6 +108,8 @@ impl Default for Settings {
             attack_points: 5_000,
             attack_mission_value: 150.0,
             director: true,
+            own_save_only: false,
+            allow_achievements: false,
         }
     }
 }
@@ -415,11 +421,26 @@ pub struct War {
     pub season_start_war: f64,
     pub season_start_time: i64,
     pub last_snapshot_hour: i64,
-    /// The Evolved war state, for a war of model "evolved". The fronts above then stay as they
-    /// started: the game still asks for them, and the Evolved War Engine mod draws this instead.
+    /// The Enhanced war data, for a war of model "enhanced": the Vanilla war above with more on top.
+    /// A placeholder for now.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub evolved: Option<crate::evolved::Evolved>,
+    pub enhanced: Option<Enhanced>,
 }
+
+/// What an Enhanced war adds to the Vanilla war. Only a version for now.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Enhanced {
+    pub version: u32,
+}
+
+impl Default for Enhanced {
+    fn default() -> Self {
+        Enhanced { version: 1 }
+    }
+}
+
+/// The war models the server runs.
+pub const MODELS: [&str; 2] = ["vanilla", "enhanced"];
 
 // ---------------------------------------------------------------- effects
 
@@ -549,7 +570,7 @@ impl War {
             season_start_war: 0.0,
             season_start_time: now,
             last_snapshot_hour: 0,
-            evolved: None,
+            enhanced: None,
         };
         let mut out = Out {
             snapshot: true,
@@ -573,25 +594,29 @@ impl War {
         self.shown(self.season)
     }
 
-    /// A new Evolved war: the HELLDIVERS 2 galaxy with campaigns, operations and Major Orders.
-    pub fn new_evolved(
+    /// A new Enhanced war: a Vanilla war with the Enhanced data placeholder.
+    pub fn new_enhanced(
         id: &str,
         name: &str,
         settings: Settings,
-        evo: crate::evolved::EvoSettings,
         now: i64,
         dice: &mut dyn Dice,
     ) -> (War, Out) {
-        let (mut war, mut out) = War::new(id, name, settings, now, dice);
-        war.model = "evolved".into();
-        let mut e = crate::evolved::Evolved::new(evo);
-        e.start(0.0, now, dice, &mut out);
-        war.evolved = Some(e);
+        let (mut war, out) = War::new(id, name, settings, now, dice);
+        war.model = "enhanced".into();
+        war.enhanced = Some(Enhanced::default());
         (war, out)
     }
 
-    pub fn is_evolved(&self) -> bool {
-        self.evolved.is_some()
+    /// Puts a loaded war on a model the server runs. A model it no longer runs (the archived
+    /// "evolved") becomes a plain Vanilla war; the data of that model was dropped when read.
+    pub fn normalize_model(&mut self) {
+        if self.model == "enhanced" {
+            self.enhanced.get_or_insert_with(Enhanced::default);
+        } else {
+            self.model = "vanilla".into();
+            self.enhanced = None;
+        }
     }
 
     // ---- lookups
@@ -686,16 +711,6 @@ impl War {
         }
         self.war_time += dt;
         out.changed = true;
-
-        if let Some(e) = self.evolved.as_mut() {
-            e.tick(self.war_time, dt, now, dice, out);
-            let hour = (self.war_time / 3600.0).floor() as i64;
-            if hour != self.last_snapshot_hour {
-                self.last_snapshot_hour = hour;
-                out.snapshot = true;
-            }
-            return;
-        }
 
         for front in 0..ENEMIES {
             let f = &self.fronts[front];
@@ -1212,10 +1227,9 @@ impl War {
 
     // ---- what the game sends
 
-    /// Whether the in-game uploads move the war. An Evolved war counts only the reports of the
-    /// Evolved War Engine mod, which name the planet and the operation.
+    /// Whether the in-game uploads move the war.
     fn crediting(&self) -> bool {
-        !self.state.ended() && self.evolved.is_none()
+        !self.state.ended()
     }
 
     /// A completed planet. `front` is 0-based here: the caller has already turned the 1-based in-game
@@ -1592,7 +1606,7 @@ impl War {
             "members": members,
             "settings": self.settings,
             "past_seasons": self.past_seasons.iter().map(|p| json!({"season": self.shown(p.season), "result": p.result, "ended": p.ended})).collect::<Vec<_>>(),
-            "evolved": self.evolved.as_ref().map(|e| e.view(self.war_time, self.speed)),
+            "enhanced": self.enhanced,
             "lan": {"open": lan_open, "port": if lan_open { lan_port } else { None }},
             "server_time": now,
         })
@@ -1604,6 +1618,7 @@ impl War {
             "model": self.model, "season": self.shown_season(), "state": self.state.as_str(),
             "war_time": self.war_time, "created": self.created, "lan": lan_open,
             "players": self.recent_players(now), "members": self.members.len(),
+            "own_save_only": self.settings.own_save_only, "allow_achievements": self.settings.allow_achievements,
             "fronts": self.fronts.iter().map(|f| json!({"enemy": f.enemy, "region": f.region(), "status": f.status.as_str()})).collect::<Vec<_>>(),
         })
     }

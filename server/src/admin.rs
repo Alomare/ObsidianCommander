@@ -1,7 +1,6 @@
 //! The admin JSON API (spec section 5). Loopback needs the token; the LAN listener answers only the
 //! read-only calls, and only for wars open to LAN.
 
-use crate::evolved::{CampaignKind, EvoSettings, OrderKind};
 use crate::http::{Req, Resp, Via};
 use crate::rules::{FrontStatus, Out, Settings, War, WarState};
 use crate::store::{FeedEntry, WarSlot};
@@ -262,13 +261,13 @@ fn create(app: &App, req: &Req) -> Resp {
     for k in body.keys() {
         if !matches!(
             k.as_str(),
-            "name" | "description" | "logo" | "model" | "settings" | "evolved"
+            "name" | "description" | "logo" | "model" | "settings"
         ) {
             return Resp::error(400, &format!("unknown field `{k}`"));
         }
     }
     let name = match clean_name(body.get("name")) {
-        Ok(n) => n.unwrap_or_else(|| "Galactic War".into()),
+        Ok(n) => n.unwrap_or_else(|| "Custom War".into()),
         Err(r) => return r,
     };
     let description = match clean_description(body.get("description")) {
@@ -279,19 +278,11 @@ fn create(app: &App, req: &Req) -> Resp {
         Ok(l) => l.unwrap_or_default(),
         Err(r) => return r,
     };
-    let evolved = match body.get("model") {
+    let enhanced = match body.get("model") {
         None => false,
         Some(Value::String(s)) if s == "vanilla" => false,
-        Some(Value::String(s)) if s == "evolved" => true,
-        Some(_) => return Resp::error(400, "`model` must be \"vanilla\" or \"evolved\""),
-    };
-    let evo_settings = match body.get("evolved") {
-        None | Some(Value::Null) => EvoSettings::default(),
-        Some(Value::Object(p)) => match EvoSettings::default().patched(p) {
-            Ok(s) => s,
-            Err(e) => return Resp::error(400, &e),
-        },
-        Some(_) => return Resp::error(400, "`evolved` must be an object"),
+        Some(Value::String(s)) if s == "enhanced" => true,
+        Some(_) => return Resp::error(400, "`model` must be \"vanilla\" or \"enhanced\""),
     };
     let settings = match settings_patch(body.get("settings")) {
         Ok(Some(p)) => match Settings::default().patched(p) {
@@ -306,14 +297,16 @@ fn create(app: &App, req: &Req) -> Resp {
     let id = new_id(app, &wars);
     let (mut war, out) = {
         let mut dice = app.dice.lock().unwrap_or_else(|e| e.into_inner());
-        if evolved {
-            War::new_evolved(&id, &name, settings, evo_settings, now, &mut *dice)
+        if enhanced {
+            War::new_enhanced(&id, &name, settings, now, &mut *dice)
         } else {
             War::new(&id, &name, settings, now, &mut *dice)
         }
     };
     war.description = description;
     war.logo = logo;
+    // A new war waits for the host to start the clock.
+    war.state = WarState::Paused;
     let mut slot = WarSlot::new(war, &app.wars_dir());
     if let Err(e) = slot.commit(out, now) {
         return Resp::error(500, &format!("could not write the war: {e}"));
@@ -346,6 +339,7 @@ fn import(app: &App, req: &Req) -> Resp {
     if !(0.5..=10.0).contains(&war.speed) {
         war.speed = 1.0;
     }
+    war.normalize_model();
     let feed: Vec<FeedEntry> = body
         .get("feed")
         .and_then(|v| serde_json::from_value(v.clone()).ok())
@@ -679,23 +673,6 @@ fn action(app: &App, req: &Req, id: &str) -> Resp {
         return Resp::error(404, "no such war");
     };
     let mut out = Out::default();
-    let name = body.get("action").and_then(Value::as_str).unwrap_or("");
-    if name.starts_with("evo_") {
-        let mut dice = app.dice.lock().unwrap_or_else(|e| e.into_inner());
-        let done = evolved_action(&mut slot.war, &body, now, &mut *dice, &mut out);
-        drop(dice);
-        return match done {
-            Ok(()) => {
-                app.log.line(&format!("war {id}: GM {name}"));
-                app.commit(slot, out, now);
-                Resp::json(200, &war_view(app, slot, now, Via::Loopback))
-            }
-            Err(e) => {
-                app.commit(slot, out, now);
-                Resp::error(400, &e)
-            }
-        };
-    }
     match run_action(&mut slot.war, &body, now, &mut out) {
         Ok((name, front, value)) => {
             let mut f = crate::rules::Feed::new("gm", format!("gm_{name}")).player("gm");
@@ -714,159 +691,5 @@ fn action(app: &App, req: &Req, id: &str) -> Resp {
             app.commit(slot, out, now);
             Resp::error(400, &e)
         }
-    }
-}
-
-// ---------------------------------------------------------------- Evolved GM actions
-
-fn get_planet(b: &Map<String, Value>, k: &str) -> Result<usize, String> {
-    let n = crate::evolved::galaxy().planets.len();
-    b.get(k)
-        .and_then(Value::as_u64)
-        .map(|p| p as usize)
-        .filter(|p| *p < n)
-        .ok_or_else(|| format!("`{k}` must be a planet number below {n}"))
-}
-
-/// `evo_planet`, `evo_campaign`, `evo_end_campaign`, `evo_order`, `evo_news`, `evo_settings`.
-fn evolved_action(
-    war: &mut War,
-    b: &Map<String, Value>,
-    now: i64,
-    dice: &mut dyn crate::rules::Dice,
-    out: &mut Out,
-) -> Result<(), String> {
-    let action = b.get("action").and_then(Value::as_str).unwrap_or("");
-    let war_time = war.war_time;
-    let Some(e) = war.evolved.as_mut() else {
-        return Err("not an Evolved war".into());
-    };
-    match action {
-        "evo_planet" => {
-            let p = get_planet(b, "planet")?;
-            let owner = b
-                .get("owner")
-                .and_then(Value::as_u64)
-                .filter(|o| *o <= 3)
-                .ok_or(
-                    "`owner` must be 0 (Super Earth), 1 (bugs), 2 (cyborgs) or 3 (illuminates)",
-                )?;
-            e.set_owner(p, owner as u8, war_time, now, out)
-        }
-        "evo_campaign" => {
-            let p = get_planet(b, "planet")?;
-            let kind = match b.get("kind").and_then(Value::as_str) {
-                None => {
-                    if e.owners[p] == 0 {
-                        CampaignKind::Defense
-                    } else {
-                        CampaignKind::Liberation
-                    }
-                }
-                Some("liberation") => CampaignKind::Liberation,
-                Some("defense") => CampaignKind::Defense,
-                Some(_) => return Err("`kind` must be \"liberation\" or \"defense\"".into()),
-            };
-            match kind {
-                CampaignKind::Liberation => {
-                    e.start_liberation(p, war_time, now, dice, out).map(|_| ())
-                }
-                CampaignKind::Defense => {
-                    let faction = b
-                        .get("faction")
-                        .and_then(Value::as_u64)
-                        .filter(|f| (1..=3).contains(f))
-                        .ok_or("`faction` must be 1 (bugs), 2 (cyborgs) or 3 (illuminates)")?;
-                    let hours = match b.get("hours") {
-                        None | Some(Value::Null) => e.settings.defense_hours,
-                        Some(v) => v
-                            .as_f64()
-                            .filter(|h| (0.25..=720.0).contains(h))
-                            .ok_or("`hours` must be between 0.25 and 720")?,
-                    };
-                    e.start_defense(p, faction as u8, hours, war_time, now, dice, out)
-                        .map(|_| ())
-                }
-            }
-        }
-        "evo_end_campaign" => {
-            let id = b
-                .get("campaign")
-                .and_then(Value::as_u64)
-                .ok_or("`campaign` must be a campaign id")?;
-            let won = b
-                .get("won")
-                .and_then(Value::as_bool)
-                .ok_or("`won` must be true or false")?;
-            e.end_campaign(id, won, war_time, now, out)
-        }
-        "evo_order" => {
-            let kind = b
-                .get("kind")
-                .and_then(Value::as_str)
-                .and_then(OrderKind::parse)
-                .ok_or("`kind` must be \"liberate\", \"defend\" or \"missions\"")?;
-            let n = crate::evolved::galaxy().planets.len();
-            let planets: Vec<usize> = match b.get("planets") {
-                None | Some(Value::Null) => vec![],
-                Some(Value::Array(a)) => {
-                    let mut v = vec![];
-                    for x in a {
-                        let p = x
-                            .as_u64()
-                            .map(|p| p as usize)
-                            .filter(|p| *p < n)
-                            .ok_or("`planets` must list planet numbers")?;
-                        if !v.contains(&p) {
-                            v.push(p);
-                        }
-                    }
-                    v
-                }
-                Some(_) => return Err("`planets` must be a list".into()),
-            };
-            let faction = b
-                .get("faction")
-                .and_then(Value::as_u64)
-                .filter(|f| *f <= 3)
-                .unwrap_or(0) as u8;
-            let target = b.get("target").and_then(Value::as_f64).unwrap_or(0.0);
-            let hours = b
-                .get("hours")
-                .and_then(Value::as_f64)
-                .unwrap_or(e.settings.order_hours);
-            let brief = b.get("brief").and_then(Value::as_str).map(str::to_string);
-            e.issue_order(
-                kind, planets, faction, target, hours, brief, "gm", war_time, now, out,
-            )
-            .map(|_| ())
-        }
-        "evo_cancel_order" => {
-            let id = b
-                .get("order")
-                .and_then(Value::as_u64)
-                .ok_or("`order` must be an order id")?;
-            e.cancel_order(id, war_time, now, out)
-        }
-        "evo_news" => {
-            let text = b
-                .get("text")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|t| !t.is_empty() && t.chars().count() <= 400)
-                .ok_or("`text` must be 1 to 400 characters")?;
-            e.post_news(text, war_time, now, out);
-            Ok(())
-        }
-        "evo_settings" => {
-            let patch = b
-                .get("settings")
-                .and_then(Value::as_object)
-                .ok_or("`settings` must be an object")?;
-            e.settings = e.settings.patched(patch)?;
-            out.changed = true;
-            Ok(())
-        }
-        _ => Err(format!("unknown action `{action}`")),
     }
 }

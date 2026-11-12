@@ -5,7 +5,9 @@ Custom Galactic Wars for HELLDIVERS (2015), hosted from the COMMANDER tab in Obs
 Two kinds of war, local or over LAN:
 
 - **Vanilla Wars** keep the campaign model built into the game, and the host sets the rules.
-- **Evolved Wars** (first version) play on the HELLDIVERS 2 galaxy: planets that change hands, supply lines, liberation and defense campaigns, operations of two or three missions, and Major Orders. Every player runs the [Evolved War Engine](https://github.com/Alomare/HD1-EvolvedWarEngine) mod, which replaces the galaxy map of the ship and reports the missions. Obsidian installs the mod and enables it in the active profile when an Evolved war is created or selected. See [docs/evolved.md](docs/evolved.md).
+- **Enhanced Wars** (planned) build on the Vanilla war with custom events, orders and subfactions, played with the Enhanced War Client mod. The model exists as a skeleton for now.
+
+Evolved Wars, the HELLDIVERS 2 galaxy model, are archived: the code is kept under the tag `archive/evolved-war`, and an Evolved war file loads as a Vanilla war.
 
 ## Parts
 
@@ -14,7 +16,6 @@ Two kinds of war, local or over LAN:
 | [server/](server/) | `commander-server`, in Rust. Holds the wars, answers the war API the game calls, runs the Vanilla rules, serves the admin API and the war screens, and runs the LAN listener and announcements |
 | [ui/](ui/) | The war screens (Vite, React, TypeScript): war list, **Create War**, the galaxy map drawn from the in-game map, Game Master commands, feed, players, and statistics with the front progress chart. `npm run dev` with `?mock=1` runs them against a fake server |
 | [data/warfront.json](data/warfront.json) | The in-game war map: regions as cells on a polar grid, and the map colours |
-| [data/galaxy-hd2.json](data/galaxy-hd2.json) | The Evolved war map: the HELLDIVERS 2 galaxy layout and sector outlines (traced by [HELLDIVERS 2 War History Central](https://github.com/crosswaveomega/helldiversplanettable)), built by [tools/build_galaxy.py](tools/build_galaxy.py) |
 | [tools/pack.py](tools/pack.py) | Builds the package ZIP that Obsidian installs, in `internal/builds/` |
 | [.github/workflows/release.yml](.github/workflows/release.yml) | A release: a `v<version>` tag on `main` builds, packs, signs and publishes the package with the notes in `docs/releases/<version>.md`. Obsidian installs a downloaded package only with that signature |
 | [tools/verify_sig.py](tools/verify_sig.py) | Checks a package signature the way Obsidian does |
@@ -27,7 +28,6 @@ The Obsidian side (the tab, the relay, war saves and the war mode in the loader)
 ## Docs
 
 - [docs/spec-m1.md](docs/spec-m1.md): the contract between Obsidian, the server and the war screens
-- [docs/evolved.md](docs/evolved.md): Evolved wars: the map data, the rules, and the API the mod and the war screens use
 - [docs/plans/](docs/plans/): the plans for the interface and for internet play
 - [docs/findings.md](docs/findings.md), [docs/protocol.md](docs/protocol.md), [docs/probe.md](docs/probe.md): the war API the game calls, and the first probes
 

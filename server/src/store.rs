@@ -139,7 +139,8 @@ impl WarSlot {
 
     pub fn load(dir: &Path) -> io::Result<Self> {
         let text = fs::read(dir.join("war.json"))?;
-        let war: War = serde_json::from_slice(&text).map_err(io::Error::other)?;
+        let mut war: War = serde_json::from_slice(&text).map_err(io::Error::other)?;
+        war.normalize_model();
         Ok(WarSlot {
             war,
             feed: read_lines(&dir.join("feed.jsonl")),

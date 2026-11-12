@@ -138,6 +138,7 @@ fn auth() -> String {
     json!({"online_id": PLAYER, "issuer_id": 256, "platform": "steam"}).to_string()
 }
 
+/// A new war, started: a war is created paused and the host starts the clock.
 fn create_war(port: u16, settings: Value) -> Value {
     let r = admin(
         port,
@@ -146,6 +147,16 @@ fn create_war(port: u16, settings: Value) -> Value {
         Some(json!({"name": "Test War", "model": "vanilla", "settings": settings})),
     );
     assert_eq!(r.status, 201, "{}", String::from_utf8_lossy(&r.body));
+    let war = r.json();
+    assert_eq!(war["state"], "paused", "a new war starts paused");
+    let id = war["id"].as_str().unwrap();
+    let r = admin(
+        port,
+        "POST",
+        &format!("/api/wars/{id}/actions"),
+        Some(json!({"action": "resume"})),
+    );
+    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
     r.json()
 }
 
@@ -894,77 +905,115 @@ fn lan_listener_serves_only_lan_wars_read_only() {
 }
 
 #[test]
-fn evolved_war_through_the_mod_routes() {
-    let (data, ui) = (temp_dir("evolved"), temp_dir("evolved-ui"));
+fn enhanced_wars_and_the_two_player_options() {
+    let (data, ui) = (temp_dir("enhanced"), temp_dir("enhanced-ui"));
     let h = start(&data, &ui);
+
+    // An Enhanced war: a Vanilla war with the placeholder, paused, named "Custom War" by default.
     let r = admin(
         h.port,
         "POST",
         "/api/wars",
-        Some(json!({"name": "Evolved Test", "model": "evolved", "evolved": {"campaigns": 2}})),
+        Some(json!({"model": "enhanced"})),
     );
     assert_eq!(r.status, 201, "{}", String::from_utf8_lossy(&r.body));
     let war = r.json();
     let id = war["id"].as_str().unwrap().to_string();
-    assert_eq!(war["model"], "evolved");
-    assert_eq!(war["evolved"]["settings"]["campaigns"], 2);
+    assert_eq!(war["model"], "enhanced");
+    assert_eq!(war["enhanced"], json!({"version": 1}));
+    assert_eq!(war["name"], "Custom War");
+    assert_eq!(war["state"], "paused");
+    assert_eq!(war["fronts"].as_array().unwrap().len(), 3);
+    assert_eq!(war["settings"]["own_save_only"], false);
+    assert_eq!(war["settings"]["allow_achievements"], false);
 
-    // The state the mod reads.
-    let s = http(h.port, "GET", &format!("/w/{id}/evolved/state"), &[], b"");
-    assert_eq!(s.status, 200);
-    let s = s.json();
-    assert_eq!(s["owners"].as_array().unwrap().len(), 273);
-    assert_eq!(s["war"]["id"], id.as_str());
-    let campaigns = s["campaigns"].as_array().unwrap();
-    assert_eq!(
-        campaigns
-            .iter()
-            .filter(|c| c["kind"] == "liberation")
-            .count(),
-        2
-    );
-    let c = &campaigns[0];
-    let op = &c["operations"][0];
-
-    // A won mission counts once per lobby.
-    let report = json!({"campaign": c["id"], "operation": op["id"], "mission": 0, "success": true,
-                        "lobby": "109775241000000001", "kills": 120, "deaths": 2});
-    let body = report.to_string();
-    let a = http(
+    // The archived model is refused for new wars.
+    let r = admin(
         h.port,
         "POST",
-        &format!("/w/{id}/evolved/report"),
-        &[
-            ("Content-Type", "application/json"),
-            ("X-Commander-Player", PLAYER),
-        ],
-        body.as_bytes(),
+        "/api/wars",
+        Some(json!({"model": "evolved"})),
+    );
+    assert_eq!(r.status, 400);
+
+    // The two options: off by default, set and checked like every setting, listed in the summary.
+    for bad in [
+        json!({"settings": {"own_save_only": 1}}),
+        json!({"settings": {"allow_achievements": "yes"}}),
+    ] {
+        let r = admin(
+            h.port,
+            "PATCH",
+            &format!("/api/wars/{id}"),
+            Some(bad.clone()),
+        );
+        assert_eq!(r.status, 400, "{bad}");
+    }
+    let info = admin(h.port, "GET", "/api/info", None).json();
+    assert_eq!(info["wars"][0]["own_save_only"], false);
+    assert_eq!(info["wars"][0]["allow_achievements"], false);
+    let w = admin(
+        h.port,
+        "PATCH",
+        &format!("/api/wars/{id}"),
+        Some(json!({"settings": {"own_save_only": true, "allow_achievements": true}})),
     )
     .json();
-    assert_eq!(a["credited"], true, "{a}");
-    assert!(a["liberation"].as_f64().unwrap() > 0.0);
-    let again = http(
+    assert_eq!(w["settings"]["own_save_only"], true);
+    assert_eq!(w["settings"]["allow_achievements"], true);
+    let info = admin(h.port, "GET", "/api/info", None).json();
+    assert_eq!(info["wars"][0]["own_save_only"], true);
+    assert_eq!(info["wars"][0]["allow_achievements"], true);
+    let created = admin(
         h.port,
         "POST",
-        &format!("/w/{id}/evolved/report"),
-        &[
-            ("Content-Type", "application/json"),
-            ("X-Commander-Player", PLAYER),
-        ],
-        body.as_bytes(),
+        "/api/wars",
+        Some(json!({"name": "Strict", "settings": {"own_save_only": true}})),
     )
     .json();
-    assert_eq!(again["credited"], false);
-    let bad = http(
-        h.port,
-        "POST",
-        &format!("/w/{id}/evolved/report"),
-        &[],
-        b"{\"campaign\": 1}",
-    );
-    assert_eq!(bad.status, 400);
+    assert_eq!(created["settings"]["own_save_only"], true);
+    assert_eq!(created["settings"]["allow_achievements"], false);
+    assert_eq!(created["model"], "vanilla");
+    assert!(created.get("enhanced").is_none_or(Value::is_null));
+    h.shutdown();
 
-    // The game polls still answer, and the stock uploads move nothing in an Evolved war.
+    // Kept over a restart.
+    let h = start(&data, &ui);
+    let w = admin(h.port, "GET", &format!("/api/wars/{id}"), None).json();
+    assert_eq!(w["model"], "enhanced");
+    assert_eq!(w["enhanced"]["version"], 1);
+    assert_eq!(w["settings"]["own_save_only"], true);
+    h.shutdown();
+}
+
+#[test]
+fn an_archived_evolved_war_loads_as_a_vanilla_war() {
+    let (data, ui) = (temp_dir("old-evolved"), temp_dir("old-evolved-ui"));
+    // Written by an older server: model "evolved" with the Evolved data, settings without the new
+    // options.
+    let h = start(&data, &ui);
+    let id = create_war(h.port, json!({}))["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    h.shutdown();
+    let file = data.join("wars").join(&id).join("war.json");
+    let mut old: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    old["model"] = json!("evolved");
+    old["evolved"] = json!({"settings": {"campaigns": 2}, "owners": [0, 1, 2], "campaigns": []});
+    let settings = old["settings"].as_object_mut().unwrap();
+    settings.remove("own_save_only");
+    settings.remove("allow_achievements");
+    std::fs::write(&file, serde_json::to_vec(&old).unwrap()).unwrap();
+
+    let h = start(&data, &ui);
+    let w = admin(h.port, "GET", &format!("/api/wars/{id}"), None);
+    assert_eq!(w.status, 200, "{}", String::from_utf8_lossy(&w.body));
+    let w = w.json();
+    assert_eq!(w["model"], "vanilla");
+    assert!(w.get("evolved").is_none());
+    assert_eq!(w["settings"]["own_save_only"], false);
+    assert_eq!(w["settings"]["allow_achievements"], false);
     let st = game(
         h.port,
         &id,
@@ -972,66 +1021,24 @@ fn evolved_war_through_the_mod_routes() {
         &[("action", "get_campaign_status")],
     );
     assert_eq!(st["error_code"], 0);
+    // The next write drops the Evolved data from the file.
+    admin(
+        h.port,
+        "PATCH",
+        &format!("/api/wars/{id}"),
+        Some(json!({"name": "Old War"})),
+    );
+    let saved: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    assert_eq!(saved["model"], "vanilla");
+    assert!(saved.get("evolved").is_none());
 
-    // The GM: a dispatch, a defense, an order.
-    let r = admin(
-        h.port,
-        "POST",
-        &format!("/api/wars/{id}/actions"),
-        Some(json!({"action": "evo_news", "text": "Hold the line."})),
-    );
-    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
-    assert!(
-        r.json()["evolved"]["news"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|n| n["text"] == "Hold the line.")
-    );
-    let r = admin(
-        h.port,
-        "POST",
-        &format!("/api/wars/{id}/actions"),
-        Some(
-            json!({"action": "evo_campaign", "planet": 0, "kind": "defense", "faction": 2, "hours": 2}),
-        ),
-    );
-    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
-    let r = admin(
-        h.port,
-        "POST",
-        &format!("/api/wars/{id}/actions"),
-        Some(json!({"action": "evo_order", "kind": "defend", "planets": [0], "hours": 5})),
-    );
-    assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
-    let r = admin(
-        h.port,
-        "POST",
-        &format!("/api/wars/{id}/actions"),
-        Some(json!({"action": "evo_planet", "planet": 9999, "owner": 1})),
-    );
-    assert_eq!(r.status, 400);
-
-    // A Vanilla war has no Evolved routes.
-    let v = admin(h.port, "POST", "/api/wars", Some(json!({"name": "Plain"}))).json();
-    let vid = v["id"].as_str().unwrap();
-    assert_eq!(
-        http(h.port, "GET", &format!("/w/{vid}/evolved/state"), &[], b"").status,
-        404
-    );
-
-    // Saved and loaded back whole.
-    h.shutdown();
-    let h = start(&data, &ui);
-    let s2 = http(h.port, "GET", &format!("/w/{id}/evolved/state"), &[], b"").json();
-    assert_eq!(s2["owners"], s["owners"]);
-    assert!(
-        s2["campaigns"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|c| c["kind"] == "defense")
-    );
+    // The same goes for an exported Evolved war brought back with Import.
+    let mut exp = admin(h.port, "GET", &format!("/api/wars/{id}/export"), None).json();
+    exp["war"]["model"] = json!("evolved");
+    exp["war"]["evolved"] = json!({"owners": []});
+    let r = admin(h.port, "POST", "/api/wars/import", Some(exp));
+    assert_eq!(r.status, 201, "{}", String::from_utf8_lossy(&r.body));
+    assert_eq!(r.json()["model"], "vanilla");
     h.shutdown();
 }
 

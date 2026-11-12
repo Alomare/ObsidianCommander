@@ -53,8 +53,11 @@ While a war is open to LAN, the server sends a UDP broadcast to `255.255.255.255
 
 ```json
 {"commander": 1, "war": "<id>", "name": "...", "model": "vanilla", "season": 1,
- "port": 17494, "host": "<computer name>", "players": 3, "version": "0.1.0"}
+ "port": 17494, "host": "<computer name>", "players": 3,
+ "own_save_only": false, "allow_achievements": false, "version": "0.1.0"}
 ```
+
+`own_save_only` and `allow_achievements` are the war settings of the same names (section 4), so Obsidian knows them before it joins.
 
 Obsidian listens on 17493 while the Join screen is open. The address comes from the packet source.
 
@@ -96,7 +99,11 @@ A Vanilla war copies the shape of the HD1 Galactic Campaign with custom rules, s
 
 **Fronts.** Three fronts, `enemy` 0 bugs, 1 cyborgs, 2 illuminates. `points` from 0 to `points_max` (default 100000). The region of a front is `clamp(floor(points / (points_max / 10)) + 1, 1, 10)`, as the game computes it. Region 1 touches Super Earth, region 10 touches the enemy home world. `status` is `active`, `defeated` or `hidden`. `introduction_order` 0, 1, 2 (a war may start with fronts `hidden` and introduce them later).
 
-**Start.** Each active front starts at `start_points` (default 15000, the middle of region 2, so enemy pressure doesn't cross a region edge at once). The game season is 1000 + a random number up to 8999, fixed at creation, so every war has a separate matchmaking pool. People see the season counted from 1: `season` in the admin API, the LAN announcement and the feed is that number, and `game_season` is the one the game gets.
+**Models.** `vanilla` is the war described here. `enhanced` is the same war with more on top later (custom events, orders, subfactions); for now it carries only `enhanced: {"version": 1}` and plays as Vanilla. A war file with a model the server no longer runs (`evolved`, archived) loads as a Vanilla war, and the data of that model is dropped.
+
+**Players.** Two settings for Obsidian, both off by default: `own_save_only` (players may play the war only on the Sandbox save made for it; off, any Sandbox save plays it) and `allow_achievements` (Steam achievements are not blocked while the war is played; the player's own Block Achievements guardrail still applies). The server only keeps them and lists them in `GET /api/info` and the LAN announcement.
+
+**Start.** A new war is created paused: the clock starts when the host resumes it. Each active front starts at `start_points` (default 15000, the middle of region 2, so enemy pressure doesn't cross a region edge at once). The game season is 1000 + a random number up to 8999, fixed at creation, so every war has a separate matchmaking pool. People see the season counted from 1: `season` in the admin API, the LAN announcement and the feed is that number, and `game_season` is the one the game gets.
 
 **Clock.** The war advances in real time while the server runs and the clock isn't paused. While the server is closed, no time passes: on start, the server resumes from where it stopped (it stores `war_time`, the seconds the war has run, and advances it by the real seconds between ticks, capped at 60 per tick). Speed multiplier: 1 (settings allow 0.5 to 10). The tick runs every 5 seconds.
 
@@ -122,8 +129,8 @@ JSON over HTTP on the loopback listener. Every call needs the admin token, excep
 
 | Call | Does |
 |---|---|
-| `GET /api/info` | `{version, protocol, wars: [summary]}` |
-| `POST /api/wars` | create: `{name, description?, logo?, model: "vanilla", settings?}`. Answers the war |
+| `GET /api/info` | `{version, protocol, wars: [summary]}`. A summary has `id`, `name`, `description`, `logo`, `model`, `season`, `state`, `war_time`, `created`, `lan`, `players`, `members`, `fronts`, `own_save_only`, `allow_achievements` |
+| `POST /api/wars` | create: `{name?, description?, logo?, model?: "vanilla" | "enhanced", settings?}`. `name` defaults to "Custom War", `model` to `vanilla`. The war starts `paused`. Answers the war |
 | `GET /api/wars/<id>` | the full war (below) |
 | `PATCH /api/wars/<id>` | change `name`, `description` (up to 600 characters), `logo` (a base64 PNG, JPEG or WebP `data:` address up to 200 kB; null or "" for the picture of the model) or any `settings` field |
 | `DELETE /api/wars/<id>` | delete the war folder |
@@ -152,7 +159,9 @@ JSON over HTTP on the loopback listener. Every call needs the admin token, excep
   "settings": {"points_max": 100000, "start_points": 15000, "pressure_per_hour": 600, "planet_value": 250,
                "defend_chance_per_hour": 0.08, "defend_duration": 14400, "defend_points": 3000,
                "defend_mission_value": 150, "defend_reward": 3000, "attack_duration": 21600,
-               "attack_points": 5000, "attack_mission_value": 150, "director": true},
+               "attack_points": 5000, "attack_mission_value": 150, "director": true,
+               "own_save_only": false, "allow_achievements": false},
+  // only for model "enhanced": "enhanced": {"version": 1}
   "lan": {"open": false, "port": null, "internet": false},
   // with the war open to the internet, and only for the host: "invite": "K7M2P-9XQ4T"
   "server_time": 1794258123
@@ -187,19 +196,23 @@ Messages with `window.postMessage`. The interface only acts on messages from the
 
 | Message | Fields |
 |---|---|
-| `obsidian:hello` | `theme` (`dark` or `light`), `lang`, `names` (game text keys to words in the game language: `region_bugs_01` ... `region_illuminates_hq`, `region_superearth_01`, `city_*`; may be empty), `playing` (the war id Obsidian has selected, or null), `game_running` |
+| `obsidian:hello` | `theme` (`dark` or `light`), `lang`, `names` (game text keys to words in the game language: `region_bugs_01` ... `region_illuminates_hq`, `region_superearth_01`, `city_*`; may be empty), `playing` (the war id Obsidian has selected, or null), `game_running`, `bar_tools` (true: Obsidian draws Import and New War in its own bar, so the war list hides its own) |
 | `obsidian:state` | `playing`, `game_running` (sent when they change) |
+| `obsidian:home` | | (no fields) shows the war list |
+| `obsidian:create` | | (no fields) opens Create War |
+| `obsidian:import` | `text` | the contents of a war file Obsidian read (`.json`, up to 16 MB). The interface parses it as JSON and imports it as its own Import does, then opens the war |
 
 **The interface to Obsidian:**
 
 | Message | Fields | Obsidian does |
 |---|---|---|
-| `commander:play` | `war`, `name` | selects that war for play: creates a Sandbox save for the war on first use, selects that save, then starts the game |
-| `commander:select` | `war`, `name` | selects that war for play without starting the game |
+| `commander:play` | `war`, `name`, `model` | selects that war for play: creates a Sandbox save for the war on first use, selects that save, then starts the game. `model` is `"enhanced"` for an Enhanced war and left out for a Vanilla war |
+| `commander:select` | `war`, `name`, `model` | selects that war for play without starting the game |
 | `commander:official` | | goes back to the official war |
 | `commander:lan` | `open` (boolean) | a war on this PC opened to LAN (`true`) or closed (`false`). On Linux, when a firewall (firewalld or ufw) shuts the LAN ports, Obsidian offers to open TCP 17494 to 17499 and UDP 17493 with the system password prompt, and records them; Remove All Commander Data closes them. Windows asks the player by itself |
-| `commander:created` | `war`, `name`, `model` | a war was created; for `model: "evolved"`, Obsidian installs the newest Evolved War Engine release when missing and enables it in the active profile. Selecting an Evolved war does the same |
-| `commander:ready` | | the interface loaded; Obsidian answers with `obsidian:hello` |
+| `commander:created` | `war`, `name`, `model` | a war was created (`model` as in `commander:play`); for an Enhanced war Obsidian sets up the companion mod, Enhanced War Client (`alomare.enhancedwar`) |
+| `commander:ready` | `tools` | the interface loaded; Obsidian answers with `obsidian:hello`. `tools: 1`: the interface takes `bar_tools`, `obsidian:create` and `obsidian:import`; Obsidian shows Import and New War in its bar only then |
+| `commander:view` | `page` (`list`, `create`, `war`), `tools` | the screen that shows; `tools` as in `commander:ready` |
 
 Region names: the loader writes them in the game language when the game first starts in war mode. Until then `names` is empty and the interface uses built-in labels.
 
