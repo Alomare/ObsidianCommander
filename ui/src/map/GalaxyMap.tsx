@@ -196,10 +196,10 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     const index = Number(i);
     const front = war.fronts.find((x) => x.enemy === enemy);
     const st = regionState(war, enemy, index);
-    const lines = [index >= 11 ? `${t("frontOf", { enemy: enemyName(enemy) })} · ${t("homeWorldState")}` : t("frontOf", { enemy: enemyName(enemy) })];
-    lines.push(st === "liberated" ? t("liberated") : st === "front" ? `${t("contested")} · ${pct(front ? regionProgress(front) : 0)}` : st === "hidden" ? t("hidden") : st === "home" ? t("homeWorldState") : t("enemyHeld"));
+    const lines = [index >= 11 ? `${t("frontOf", { enemy: enemyName(enemy) })} Â· ${t("homeWorldState")}` : t("frontOf", { enemy: enemyName(enemy) })];
+    lines.push(st === "liberated" ? t("liberated") : st === "front" ? `${t("contested")} Â· ${pct(front ? regionProgress(front) : 0)}` : st === "hidden" ? t("hidden") : st === "home" ? t("homeWorldState") : t("enemyHeld"));
     const ev = events.get(id);
-    if (ev) lines.push(`${ev.region >= 11 ? t("attackOn", { region: "" }).trim() : t("defense")} · ${pct(ev.points / ev.points_max)} · ${clock(ev.end_time - nowUnix)}`);
+    if (ev) lines.push(`${ev.region >= 11 ? t("attackOn", { region: "" }).trim() : t("defense")} Â· ${pct(ev.points / ev.points_max)} Â· ${clock(ev.end_time - nowUnix)}`);
     return { title: regionName(enemy, index, names), lines };
   }, [events, names, nowUnix, war]);
 
