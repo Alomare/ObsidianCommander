@@ -8,6 +8,10 @@ Interface:
   Saira, SIL Open Font License 1.1, Copyright 2018 The Saira Project Authors (via @fontsource-variable/saira).
   Barlow, SIL Open Font License 1.1, Copyright 2017 The Barlow Project Authors (via @fontsource/barlow).
 
+The faction icons (ui/src/assets/faction-*.png) are the HELLDIVERS faction emblems as published on
+helldivers.wiki.gg (https://helldivers.wiki.gg), credited to that wiki and its uploaders. The emblems,
+and the HELLDIVERS skull the war model icons are traced from, are property of Arrowhead Game Studios.
+
 The war map's shape (data/warfront.json) is a list of grid cells and colours read from HELLDIVERS'
 own settings. HELLDIVERS is a trademark of Sony Interactive Entertainment; Obsidian Commander is a
 fan project, not made or endorsed by Arrowhead Game Studios or Sony.

@@ -104,13 +104,13 @@ function FrontPanel({ war, front, region, names, readOnly, run, nowUnix }: Props
         <span className="sel-icon"><EnemyIcon enemy={enemy} width={22} height={22} /></span>
         <div className="sel-title">
           <h2>{region == null ? t("frontOf", { enemy: enemyName(enemy) }) : regionName(enemy, region, names)}</h2>
-          <span className="muted">{region == null ? tk(`status_${front.status}`) : `${t("frontOf", { enemy: enemyName(enemy) })} · ${home ? t("homeWorldState") : t("regionOf", { n: shown })}`}{home && <IInfo className="info" width={14} height={14} />}</span>
+          <span className="muted">{region == null ? tk(`status_${front.status}`) : home ? `${t("frontOf", { enemy: enemyName(enemy) })} · ${t("homeWorldState")}` : t("frontOf", { enemy: enemyName(enemy) })}{home && <IInfo className="info" width={14} height={14} />}</span>
         </div>
         {region != null && <span className={`state-chip ${st}`}>{stateLabel}</span>}
       </div>
 
       <section className="cmd-section">
-        <div className="kv"><span>{t("liberation")}</span><b>{front.status === "hidden" ? "—" : t("regionsOf", { n: front.status === "defeated" ? 10 : cur - 1 })}</b></div>
+        <div className="kv"><span>{t("liberation")}</span><b>{front.status === "hidden" ? "—" : pct(total)}</b></div>
         <Bar value={total} color={HELLDIVER_ACCENT} marks={10} className="big" />
         {front.status === "active" && <>
           <div className="kv"><span>{t("inRegion", { n: cur })}</span><b>{pct(within)}</b></div>

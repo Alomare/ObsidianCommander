@@ -198,11 +198,22 @@ export function NumberField({ value, min, max, step, onChange, suffix, width }: 
   };
   return (
     <span className="num-field" style={width ? { width } : undefined}>
-      <input type="number" inputMode="decimal" value={text} min={min} max={max} step={step}
+      <input type="text" inputMode="decimal" autoComplete="off" spellCheck={false} value={text}
         onFocus={() => { focused.current = true; }}
         onBlur={() => { focused.current = false; commit(); }}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          // Arrow keys step the value, as a number field does, without the browser spin buttons.
+          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            const v = Number(text.replace(/,/g, ""));
+            const c = Math.min(max, Math.max(min, (Number.isFinite(v) ? v : value) + (e.key === "ArrowUp" ? step : -step)));
+            const r = Math.round(c * 1000) / 1000;
+            setText(String(r));
+            onChange(r);
+          }
+        }} />
       {suffix && <i>{suffix}</i>}
     </span>
   );

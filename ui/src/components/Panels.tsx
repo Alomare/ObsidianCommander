@@ -1,16 +1,12 @@
-// Side panel tabs: the feed, the players, statistics with the fronts over time, and the war settings dialog.
-import { useMemo, useState, type CSSProperties } from "react";
-import { api } from "../api";
-import { sanitize } from "../settings";
+// Side panel tabs: the feed, the players, and statistics with the fronts over time.
+import { useMemo, type CSSProperties } from "react";
 import { t } from "../strings";
-import type { FeedEntry, Settings, Snapshot, War } from "../types";
+import type { FeedEntry, Snapshot, War } from "../types";
 import { ago, enemyName, feedText, feedTone, memberName, num, pct, timeOfDay, dateTime, FACTION_OF } from "../util";
 import { FACTION_ACCENT } from "../map/GalaxyMap";
 import { EnemyIcon } from "./Icons";
-import { SettingsForm } from "./SettingsForm";
 import { HistoryChart } from "./HistoryChart";
 import { ONLINE_S } from "./CommandPanel";
-import { Modal, notify } from "./ui";
 import type { Selection } from "../map/GalaxyMap";
 
 export function FeedList({ feed, war, names, onSelect }: { feed: FeedEntry[]; war: War; names: Record<string, string>; onSelect: (s: Selection) => void }) {
@@ -120,27 +116,3 @@ export function Tile({ label, value, sub, tip }: { label: string; value: string;
   );
 }
 
-export function SettingsDialog({ war, onClose, onSaved }: { war: War; onClose: () => void; onSaved: (w: War) => void }) {
-  const [settings, setSettings] = useState<Settings>(war.settings);
-  const [busy, setBusy] = useState(false);
-  const dirty = JSON.stringify(settings) !== JSON.stringify(war.settings);
-  const save = async () => {
-    setBusy(true);
-    try {
-      const w = await api.patchWar(war.id, { settings: sanitize(settings) });
-      onSaved(w);
-      onClose();
-    } catch (e) {
-      notify(e instanceof Error ? e.message : String(e), true);
-      setBusy(false);
-    }
-  };
-  return (
-    <Modal title={t("settings")} onClose={onClose} className="settings-dialog" keep={dirty} foot={<>
-      <button className="btn" onClick={onClose}>{t("cancel")}</button>
-      <button className="btn play" disabled={busy || !dirty} onClick={save}>{t("save")}</button>
-    </>}>
-      <SettingsForm value={settings} onChange={setSettings} />
-    </Modal>
-  );
-}

@@ -1,4 +1,4 @@
-// Every war setting with a plain description and a range. Used by Create War and by Settings.
+// Every war setting with a plain description and a range, for the war settings dialog.
 import { Fragment } from "react";
 import { FIELDS, fromShown, toShown, type Field } from "../settings";
 import { t, tk, type StringKey } from "../strings";
@@ -14,7 +14,7 @@ function unit(f: Field): string {
 }
 
 export function SettingsForm({ value, onChange }: { value: Settings; onChange: (s: Settings) => void }) {
-  const groups: StringKey[] = ["groupFronts", "groupDefense", "groupAttack"];
+  const groups: StringKey[] = ["groupFronts", "groupDefense", "groupAttack", "groupPlayers"];
   const set = (f: Field, shown: number) => onChange({ ...value, [f.key]: fromShown(f, shown) });
   const step = value.points_max / 10;
   return (
@@ -31,7 +31,6 @@ export function SettingsForm({ value, onChange }: { value: Settings; onChange: (
                 <div className="set-text">
                   <label className="set-name">{tk(`set_${f.key}`)}</label>
                   <small>{tk(`setText_${f.key}`)}</small>
-                  {f.key === "start_points" && <small className="set-hint">{t("regionOf", { n: Math.min(10, Math.floor(value.start_points / step) + 1) })}</small>}
                   {f.key === "points_max" && <small className="set-hint">{num(step)} {t("points")} / {t("region").toLowerCase()}</small>}
                 </div>
                 <div className="set-ctl">

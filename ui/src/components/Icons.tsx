@@ -1,5 +1,8 @@
 // Line icons in one style: 24 units, 1.8 stroke, square ends where the shape allows.
-import type { SVGProps } from "react";
+import { useId, type CSSProperties, type SVGProps } from "react";
+import bugsIcon from "../assets/faction-bugs.png";
+import cyborgsIcon from "../assets/faction-cyborgs.png";
+import illuminatesIcon from "../assets/faction-illuminates.png";
 
 type P = SVGProps<SVGSVGElement>;
 const base = (p: P) => ({
@@ -47,9 +50,39 @@ export const IDown = (p: P) => <svg {...base(p)}><path d="M5 9l7 7 7-7" /></svg>
 export const IFlag = (p: P) => <svg {...base(p)}><path d="M5 21V4M5 4h12l-2 4 2 4H5" /></svg>;
 export const IEye = (p: P) => <svg {...base(p)}><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 export const IInfo = (p: P) => <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v1" /></svg>;
-export const IBug = (p: P) => <svg {...base(p)}><ellipse cx="12" cy="13" rx="5" ry="7" /><path d="M12 6v14M7 10H3M7 15H3M17 10h4M17 15h4M9 5L7 2M15 5l2-3" /></svg>;
-export const ICyborg = (p: P) => <svg {...base(p)}><path d="M5 4h14v9l-3 7H8l-3-7z" /><path d="M8 10h3M13 10h3" strokeWidth={2.4} /></svg>;
-export const IIlluminate = (p: P) => <svg {...base(p)}><path d="M12 3l9 17H3z" /><circle cx="12" cy="14" r="2.5" /></svg>;
+/** The HELLDIVERS (2015) faction emblems (helldivers.wiki.gg; property of Arrowhead Game Studios), used as
+    masks, so they fill solid in the current colour: the faction colour where the parent sets it. */
+const FACTION_ICON = [bugsIcon, cyborgsIcon, illuminatesIcon];
+export const EnemyIcon = ({ enemy, width = 18, height = 18, className = "", style }: { enemy: number; width?: number | string; height?: number | string; className?: string; style?: CSSProperties }) => {
+  const url = `url("${FACTION_ICON[enemy] ?? FACTION_ICON[2]}")`;
+  return <span className={`enemy-icon ${className}`} aria-hidden style={{ width, height, WebkitMaskImage: url, maskImage: url, ...style }} />;
+};
 
-export const EnemyIcon = ({ enemy, ...p }: P & { enemy: number }) =>
-  enemy === 0 ? <IBug {...p} /> : enemy === 1 ? <ICyborg {...p} /> : <IIlluminate {...p} />;
+/** The HELLDIVERS (2015) skull, traced from the game logo. `vanilla`: white with a little shading; `enhanced`:
+    gold with a glow. */
+const SKULL = "M130 14H190L282 68V198L313 239L239 297L231 290L200 327H120L89 290L81 297L7 239L38 198V68Z"
+  + "M64 221a30 30 0 1 0 60 0a30 30 0 1 0 -60 0Z M196 221a30 30 0 1 0 60 0a30 30 0 1 0 -60 0Z"
+  + "M160 253L180 283L174 288L160 276L146 288L140 283Z";
+export function Skull({ variant = "vanilla", ...p }: P & { variant?: "vanilla" | "enhanced" }) {
+  const id = `skull-${useId().replace(/:/g, "")}`;
+  return (
+    <svg viewBox="-6 2 332 338" width={48} height={48} aria-hidden className={`skull ${variant}`} {...p}>
+      <defs>
+        {variant === "enhanced" ? (
+          <linearGradient id={id} x1="0" y1="0" x2="0.35" y2="1">
+            <stop offset="0" stopColor="#fff3c4" />
+            <stop offset="0.45" stopColor="#f6c443" />
+            <stop offset="1" stopColor="#b9780e" />
+          </linearGradient>
+        ) : (
+          <linearGradient id={id} x1="0" y1="0" x2="0.3" y2="1">
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset="0.6" stopColor="#e9ecf1" />
+            <stop offset="1" stopColor="#b9c0cb" />
+          </linearGradient>
+        )}
+      </defs>
+      <path d={SKULL} fillRule="evenodd" fill={`url(#${id})`} stroke={variant === "enhanced" ? "#7a4a00" : "rgba(40, 46, 58, 0.55)"} strokeWidth={5} strokeLinejoin="round" paintOrder="stroke" />
+    </svg>
+  );
+}

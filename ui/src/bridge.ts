@@ -13,6 +13,8 @@ export interface HostState {
   names: Record<string, string>;
   playing: string | null;
   gameRunning: boolean;
+  /** Obsidian draws Import and New War in its own bar: the war list hides its own. */
+  barTools: boolean;
 }
 
 const params = new URLSearchParams(location.search);
@@ -25,6 +27,7 @@ let state: HostState = {
   names: {},
   playing: isMock ? params.get("playing") : null,
   gameRunning: false,
+  barTools: isMock && params.get("bartools") === "1",
 };
 const subs = new Set<() => void>();
 function set(patch: Partial<HostState>) {
@@ -45,6 +48,7 @@ function onMessage(e: MessageEvent) {
   if (d.type === "obsidian:hello") {
     patch.inObsidian = true;
     if (d.theme === "dark" || d.theme === "light") patch.theme = d.theme;
+    if (typeof d.bar_tools === "boolean") patch.barTools = d.bar_tools;
     const lang = str(d.lang, 16);
     if (lang) patch.lang = lang;
     if (d.names && typeof d.names === "object" && !Array.isArray(d.names)) {
@@ -59,19 +63,33 @@ function onMessage(e: MessageEvent) {
   } else if (d.type === "obsidian:state") {
     set(patch);
   } else if (d.type === "obsidian:home") {
-    onHome?.();
+    handlers?.home();
+  } else if (d.type === "obsidian:create") {
+    handlers?.create();
+  } else if (d.type === "obsidian:import") {
+    // Obsidian reads the file (a .json up to 16 MB) and hands over the text.
+    const text = str(d.text, IMPORT_MAX);
+    if (text !== null) handlers?.importText(text);
   }
 }
 
-/** What runs when Obsidian asks for the war list: the Commander tab in Obsidian clicked while open. */
-let onHome: (() => void) | null = null;
-export function setHomeHandler(f: (() => void) | null) {
-  onHome = f;
+const IMPORT_MAX = 16 * 1024 * 1024;
+
+/** What runs when Obsidian asks for something: the war list (the Commander tab clicked while open), Create
+    War and Import from the buttons in the Obsidian bar. */
+export interface HostHandlers { home: () => void; create: () => void; importText: (text: string) => void }
+let handlers: HostHandlers | null = null;
+export function setHostHandlers(h: HostHandlers | null) {
+  handlers = h;
 }
+
+/** This page takes `bar_tools`, `obsidian:create` and `obsidian:import`: Obsidian shows Import and New War in
+    its bar only for a page that says so. */
+const TOOLS = 1;
 
 /** Tells Obsidian which screen shows, so Obsidian keeps the row of buttons it draws under the war list only. */
 export function reportView(page: "list" | "create" | "war") {
-  post({ type: "commander:view", page });
+  post({ type: "commander:view", page, tools: TOOLS });
 }
 
 function post(msg: Record<string, unknown>) {
@@ -81,7 +99,7 @@ function post(msg: Record<string, unknown>) {
 export function startBridge() {
   document.documentElement.dataset.theme = state.theme;
   window.addEventListener("message", onMessage);
-  post({ type: "commander:ready" });
+  post({ type: "commander:ready", tools: TOOLS });
 }
 
 export function useHost(): HostState {
@@ -94,10 +112,10 @@ export function useHost(): HostState {
 /** True when a Play press reaches someone: Obsidian, or the mock. */
 export const canPlay = () => embedded || isMock;
 
-/** The war model for Obsidian: "evolved" switches on the companion mod. A Vanilla war sends no `model`
+/** The war model for Obsidian: "enhanced" switches on the companion mod. A Vanilla war sends no `model`
     field, so older launchers get the same messages as before. */
-export type PlayModel = "evolved" | undefined;
-export const playModel = (model: string | undefined | null): PlayModel => (model === "evolved" ? "evolved" : undefined);
+export type PlayModel = "enhanced" | undefined;
+export const playModel = (model: string | undefined | null): PlayModel => (model === "enhanced" ? "enhanced" : undefined);
 
 export function play(war: string, name: string, model?: PlayModel) {
   if (!canPlay()) { notify(t("playOutside")); return; }
@@ -108,8 +126,8 @@ export function selectWar(war: string, name: string, model?: PlayModel) {
   post({ type: "commander:select", war, name, ...(model ? { model } : {}) });
   if (isMock && !embedded) set({ playing: war });
 }
-/** A war was made here. For an Evolved war, Obsidian installs the Evolved War Engine mod and enables
-    it in the active profile; older launchers ignore the message. */
+/** A war was made here. For an Enhanced war, Obsidian sets up the Enhanced War Client mod; older launchers
+    ignore the message. */
 export function warCreated(war: string, name: string, model?: PlayModel) {
   post({ type: "commander:created", war, name, ...(model ? { model } : {}) });
 }

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { hasToken, isMock } from "./api";
-import { reportView, setHomeHandler } from "./bridge";
-import { Notices, TipLayer } from "./components/ui";
+import { api, hasToken, isMock } from "./api";
+import { reportView, setHostHandlers } from "./bridge";
+import { Notices, TipLayer, notify } from "./components/ui";
 import { WarList } from "./components/WarList";
 import { CreateWar } from "./components/CreateWar";
 import { WarView } from "./components/WarView";
+import { t } from "./strings";
 
 type Route = { page: "list" } | { page: "create" } | { page: "war"; id: string };
 
@@ -19,6 +20,19 @@ function fromHash(): Route {
   const m = /^war\/([A-Za-z0-9_-]{1,64})$/.exec(h);
   if (m) return { page: "war", id: m[1] };
   return { page: "list" };
+}
+
+/** Imports a war file from its text, the same way for Import in the war list and Import in the Obsidian bar.
+    Answers the new war id, or null after a notice. */
+export async function importWarText(text: string): Promise<string | null> {
+  try {
+    const w = await api.importWar(JSON.parse(text));
+    notify(t("importDone"));
+    return w.id;
+  } catch {
+    notify(t("importFailed"), true);
+    return null;
+  }
 }
 
 export function App() {
@@ -38,12 +52,17 @@ export function App() {
     setRoute(r);
   };
 
-  // Obsidian hears which screen shows, and the Commander tab there brings the war list back.
+  // Obsidian hears which screen shows; the Commander tab there brings the war list back, and the Import and
+  // New War buttons of the Obsidian bar act here.
   useEffect(() => { reportView(route.page); }, [route.page]);
   useEffect(() => {
     if (guestWar) return;
-    setHomeHandler(() => go({ page: "list" }));
-    return () => setHomeHandler(null);
+    setHostHandlers({
+      home: () => go({ page: "list" }),
+      create: () => { if (!readOnly) go({ page: "create" }); },
+      importText: async (text) => { if (readOnly) return; const id = await importWarText(text); if (id) go({ page: "war", id }); },
+    });
+    return () => setHostHandlers(null);
   });
 
   return (

@@ -1,4 +1,4 @@
-// War settings: defaults (spec section 4), the presets, and what the Advanced form shows for each field.
+// War settings: defaults (spec section 4), the presets, and what the settings form shows for each field.
 
 import type { Settings } from "./types";
 import type { StringKey } from "./strings";
@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   points_max: 100000, start_points: 15000, pressure_per_hour: 600, planet_value: 250,
   defend_chance_per_hour: 0.08, defend_duration: 14400, defend_points: 3000, defend_mission_value: 150,
   defend_reward: 3000, attack_duration: 21600, attack_points: 5000, attack_mission_value: 150, director: true,
+  own_save_only: false, allow_achievements: false,
 };
 
 export type PresetId = "standard" | "short" | "hard";
@@ -49,6 +50,8 @@ export const FIELDS: Field[] = [
   { key: "attack_duration", kind: "hours", min: 0.5, max: 72, step: 0.5, group: "groupAttack" },
   { key: "attack_points", kind: "int", min: 100, max: 100000, step: 100, group: "groupAttack" },
   { key: "attack_mission_value", kind: "int", min: 10, max: 10000, step: 10, group: "groupAttack" },
+  { key: "own_save_only", kind: "bool", min: 0, max: 1, step: 1, group: "groupPlayers" },
+  { key: "allow_achievements", kind: "bool", min: 0, max: 1, step: 1, group: "groupPlayers" },
 ];
 
 /** A setting value in the unit the form shows. */

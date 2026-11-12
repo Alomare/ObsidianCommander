@@ -1,9 +1,11 @@
-// The galactic war overview: the in-game map, regions coloured by who holds them, events marked.
+// The galactic war overview: the in-game map, regions coloured by who holds them, events marked. The only
+// text on the map is the sector numbers; names and states are in the tooltip and the side panel.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type KeyboardEvent as RKeyboardEvent } from "react";
 import type { War, WarEvent } from "../types";
+import { isMock } from "../api";
 import { t } from "../strings";
 import { clock, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
-import { FACTIONS, FRONT_MID, FRONT_SPAN, OUTER_R, REGIONS, SUPER_EARTH_R, arcPath, gameColor, polar, ringRadius, wedgePath, type Faction, type RegionShape } from "./geometry";
+import { FACTIONS, FRONT_MID, FRONT_SPAN, OUTER_R, REGIONS, SUPER_EARTH_R, gameColor, polar, ringRadius, wedgePath, type Faction, type RegionShape } from "./geometry";
 
 export type Selection =
   | { kind: "front"; enemy: number }
@@ -24,12 +26,20 @@ export function regionState(war: War, enemy: number, index: number): RegionState
   return "enemy";
 }
 
-/** Colours per faction and state, from the game table. Alphas lifted, as the game draws additively over a bright backdrop. */
+/** The home world colours: the faction colour, the Illuminates in blue. */
+const HOME: Record<Faction, { fill: string; stroke: string }> = {
+  bugs: { fill: "rgba(70, 200, 150, 0.55)", stroke: "rgba(120, 240, 190, 0.95)" },
+  cyborgs: { fill: "rgba(215, 70, 50, 0.55)", stroke: "rgba(255, 120, 95, 0.95)" },
+  illuminates: { fill: "rgba(40, 110, 245, 0.6)", stroke: "rgba(110, 170, 255, 0.95)" },
+};
+
+/** Colours per faction and state. Enemy ground keeps the game table colours; liberated sectors are light grey,
+    the sector on the front line bright yellow. */
 function paint(f: Faction, s: RegionState): { fill: string; stroke: string } {
   switch (s) {
-    case "liberated": return { fill: gameColor("helldivers", "fill_color", 0.5), stroke: gameColor("helldivers", "border_color", 1) };
-    case "front": return { fill: gameColor(f, "active_fill_color", 0.62), stroke: gameColor(f, "active_border_color", 1.25) };
-    case "home": return { fill: gameColor(f, "hq_fill_color", 0.95), stroke: gameColor(f, "hq_border_color", 1.4) };
+    case "liberated": return { fill: "rgba(196, 202, 212, 0.42)", stroke: "rgba(226, 231, 238, 0.85)" };
+    case "front": return { fill: "rgba(255, 214, 10, 0.9)", stroke: "rgba(255, 240, 150, 1)" };
+    case "home": return HOME[f];
     case "hidden": return { fill: gameColor("hidden", "fill_color", 2.4), stroke: gameColor("hidden", "border_color", 1.6) };
     default: return { fill: gameColor(f, "fill_color", 1.15), stroke: gameColor(f, "border_color", 1.7) };
   }
@@ -43,9 +53,33 @@ export const FACTION_ACCENT: Record<Faction, string> = {
 /** The Helldiver amber of the in-game progress bars (bar_color is [r, g, b], without alpha). */
 export const HELLDIVER_ACCENT = "rgb(255, 170, 20)";
 
-// Room for the home world names: they sit beside and under the rings, never above them.
-const PAD_X = 100, PAD_TOP = 28, PAD_BOTTOM = 92;
-const FULL = { x: -OUTER_R - PAD_X, y: -OUTER_R - PAD_TOP, w: (OUTER_R + PAD_X) * 2, h: OUTER_R * 2 + PAD_TOP + PAD_BOTTOM };
+// A little room around the rings for the event rings and the home world spheres.
+const PAD = 30;
+const FULL = { x: -OUTER_R - PAD, y: -OUTER_R - PAD, w: (OUTER_R + PAD) * 2, h: (OUTER_R + PAD) * 2 };
+type View = typeof FULL;
+/** Mock only, for screenshots: `&zoom=2` starts zoomed in twice on the middle. */
+const MOCK_VIEW: View = (() => {
+  const k = isMock ? Number(new URLSearchParams(location.search).get("zoom")) : 0;
+  if (!(k > 1 && k <= 4)) return FULL;
+  const w = FULL.w / k, h = FULL.h / k;
+  return { x: -w / 2, y: -h / 2, w, h };
+})();
+
+/** Where the view sits on screen: the map fills the stage right of `inset` (the events column on a wide
+    stage), and the SVG spans the whole stage, so a zoomed map runs on under the column. `s` is pixels per
+    map unit, (x0, y0) the screen point of the view corner. */
+function layout(v: View, w: number, h: number, inset: number) {
+  const aw = Math.max(1, w - inset);
+  const s = Math.max(1e-6, Math.min(aw / v.w, h / v.h));
+  const x0 = inset + (aw - v.w * s) / 2, y0 = (h - v.h * s) / 2;
+  return { s, x0, y0, box: `${v.x - x0 / s} ${v.y - y0 / s} ${w / s} ${h / s}` };
+}
+
+/** The width of the events column beside the map on a wide stage (styles.css: .status-col), else 0. */
+function columnInset(w: number, h: number): number {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return w / Math.max(1, h) >= 1.25 && w >= 30 * rem ? 17.4 * rem : 0;
+}
 
 interface Props {
   war: War;
@@ -67,7 +101,7 @@ function eventsByRegion(war: War): Map<string, WarEvent> {
 export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSelect, nowUnix }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
-  const [view, setView] = useState(FULL);
+  const [view, setView] = useState<View>(MOCK_VIEW);
   const [hover, setHover] = useState<Hover>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean; id: number } | null>(null);
@@ -85,16 +119,16 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const ppu = Math.max(0.05, Math.min(size.w / view.w, size.h / view.h));
+  const inset = columnInset(size.w, size.h);
+  const lay = layout(view, size.w, size.h, inset);
+  const layRef = useRef(lay);
+  layRef.current = lay;
+  const ppu = Math.max(0.05, lay.s);
   /** A font size in map units: `base` at full size, never under `minPx` on screen, never over `max`
    *  units or `maxPx` on screen, so the text keeps a set size when the map is zoomed in close. */
   const fs = (base: number, minPx: number, max: number, maxPx: number) => Math.min(max, maxPx / ppu, Math.max(base, minPx / ppu));
-  const nameF = fs(24, 12.5, 46, 26), subF = fs(16, 10.5, 34, 18), numF = fs(19, 10.5, 34, 24), frontF = fs(23, 13, 40, 30), seF = fs(16, 10.5, 30, 20);
+  const numF = fs(19, 10.5, 34, 24), frontF = fs(23, 13, 40, 30);
   const markK = Math.min(3.2, Math.max(10.5 / (12 * ppu), Math.min(1.5, 2.6 / ppu)));
-  // Home world labels: top fronts write outward from the ring, the bottom front inward, so both lines
-  // stack the same way at any font size.
-  const rSubTop = OUTER_R + 8, rNameTop = rSubTop + subF * 1.17;
-  const rNameBottom = OUTER_R + 8 + nameF * 0.72, rSubBottom = rNameBottom + subF * 1.17;
 
   // Wheel zoom about the pointer, from the whole map down to a quarter of it.
   useEffect(() => {
@@ -106,9 +140,8 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
       setView((v) => {
         const k = Math.exp(e.deltaY * 0.0015);
         const w = Math.min(FULL.w, Math.max(FULL.w / 4, v.w * k));
-        const s = Math.min(r.width / v.w, r.height / v.h);
-        const ox = (r.width - v.w * s) / 2, oy = (r.height - v.h * s) / 2;
-        const px = v.x + (e.clientX - r.left - ox) / s, py = v.y + (e.clientY - r.top - oy) / s;
+        const { s, x0, y0 } = layout(v, r.width, r.height, columnInset(r.width, r.height));
+        const px = v.x + (e.clientX - r.left - x0) / s, py = v.y + (e.clientY - r.top - y0) / s;
         const ratio = w / v.w;
         return clampView({ x: px - (px - v.x) * ratio, y: py - (py - v.y) * ratio, w, h: (w * FULL.h) / FULL.w });
       });
@@ -127,8 +160,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
       const dx = e.clientX - d.x, dy = e.clientY - d.y;
       if (!d.moved && Math.hypot(dx, dy) > 5) { d.moved = true; svg.current?.setPointerCapture(d.id); }
       if (d.moved) {
-        const r = svg.current!.getBoundingClientRect();
-        const s = Math.min(r.width / view.w, r.height / view.h);
+        const s = layRef.current.s;
         setView((v) => clampView({ ...v, x: d.vx - dx / s, y: d.vy - dy / s }));
         setHover(null);
         return;
@@ -164,7 +196,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     const index = Number(i);
     const front = war.fronts.find((x) => x.enemy === enemy);
     const st = regionState(war, enemy, index);
-    const lines = [`${t("frontOf", { enemy: enemyName(enemy) })} · ${index >= 11 ? t("homeWorldState") : t("regionOf", { n: index })}`];
+    const lines = [index >= 11 ? `${t("frontOf", { enemy: enemyName(enemy) })} · ${t("homeWorldState")}` : t("frontOf", { enemy: enemyName(enemy) })];
     lines.push(st === "liberated" ? t("liberated") : st === "front" ? `${t("contested")} · ${pct(front ? regionProgress(front) : 0)}` : st === "hidden" ? t("hidden") : st === "home" ? t("homeWorldState") : t("enemyHeld"));
     const ev = events.get(id);
     if (ev) lines.push(`${ev.region >= 11 ? t("attackOn", { region: "" }).trim() : t("defense")} · ${pct(ev.points / ev.points_max)} · ${clock(ev.end_time - nowUnix)}`);
@@ -190,7 +222,9 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     }
   };
 
-  const vb = `${view.x} ${view.y} ${view.w} ${view.h}`;
+  const vb = lay.box;
+  // A zoomed map runs on under the events column, faint there so the column stays readable.
+  const fade = inset > 0 && zoomed ? `linear-gradient(90deg, rgba(0, 0, 0, 0.1) ${inset}px, #000 ${inset + 1}px)` : undefined;
   const shapesByFaction = useMemo(() => {
     const m: Record<Faction, RegionShape[]> = { bugs: [], cyborgs: [], illuminates: [] };
     for (const r of REGIONS) m[r.faction].push(r);
@@ -201,6 +235,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     <div ref={wrap} className={`galaxy${zoomed ? " zoomed" : ""}`}>
       <Starfield />
       <svg ref={svg} className="galaxy-svg" viewBox={vb} preserveAspectRatio="xMidYMid meet" tabIndex={0} role="application" aria-label={t("mapTitle")}
+        style={fade ? { WebkitMaskImage: fade, maskImage: fade } : undefined}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setHover(null)} onKeyDown={onKey}
         onDoubleClick={() => setView(FULL)}
         onClick={(e) => { if (!(e.target as Element).closest("[data-region]") && !drag.current?.moved) onSelect(null); }}>
@@ -225,16 +260,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
             <feGaussianBlur stdDeviation="5" result="b" />
             <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          {FACTIONS.map((f) => {
-            const top = f !== "illuminates";
-            const [a, b] = FRONT_SPAN[f];
-            const rName = top ? rNameTop : rNameBottom;
-            const rSub = top ? rSubTop : rSubBottom;
-            return [
-              <path key={`${f}-n`} id={`hwn-${f}`} d={top ? arcPath(rName, b + 2, a - 2) : arcPath(rName, a - 2, b + 2)} />,
-              <path key={`${f}-s`} id={`hws-${f}`} d={top ? arcPath(rSub, b + 2, a - 2) : arcPath(rSub, a - 2, b + 2)} />,
-            ];
-          })}
+          <HomeDefs />
         </defs>
 
         <circle r={OUTER_R + 70} fill="url(#map-haze)" />
@@ -279,30 +305,23 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
           <circle r={SUPER_EARTH_R} fill="url(#se-core)" className="se-core" />
           <path className="se-lines" d={`M${-SUPER_EARTH_R * 0.92} -12 Q0 ${-SUPER_EARTH_R * 0.25} ${SUPER_EARTH_R * 0.92} -12 M${-SUPER_EARTH_R * 0.78} 26 Q0 ${SUPER_EARTH_R * 0.62} ${SUPER_EARTH_R * 0.78} 26`} />
           <circle r={SUPER_EARTH_R + 4} className="se-ring" />
-          <text y={SUPER_EARTH_R + 8 + seF} className="se-label" style={{ fontSize: seF }}>{regionName(null, 0, names).toUpperCase()}</text>
         </g>
 
-        {/* Home world names and front state at the outer ring. */}
-        <g className="hw-labels">
-          {FACTIONS.map((f) => {
-            const enemy = FACTION_OF.indexOf(f);
-            const front = war.fronts.find((x) => x.enemy === enemy);
-            const status = !front || front.status === "hidden" ? t("hidden") : front.status === "defeated" ? t("status_defeated") : `${enemyName(enemy)} · ${t("regionOf", { n: regionOf(front) })}`;
-            return (
-              <g key={f} className={`hw ${f}${front?.status === "hidden" ? " dim" : ""}`}>
-                <text className="hw-name" style={{ fontSize: nameF }}><textPath href={`#hwn-${f}`} startOffset="50%">{regionName(enemy, 11, names).toUpperCase()}</textPath></text>
-                <text className="hw-sub" style={{ fontSize: subF, fill: front?.status === "active" ? FACTION_ACCENT[f] : undefined }}><textPath href={`#hws-${f}`} startOffset="50%">{status.toUpperCase()}</textPath></text>
-              </g>
-            );
-          })}
-        </g>
+        {/* The enemy home worlds: a sphere for each, in the colour of the faction. */}
+        {FACTIONS.map((f) => {
+          const id = `${f}:11`;
+          const shape = REGIONS.find((r) => r.id === id);
+          if (!shape) return null;
+          const st = regionState(war, FACTION_OF.indexOf(f), 11);
+          const [x, y] = polar((ringRadius(10) + ringRadius(11)) / 2, FRONT_MID[f]);
+          return <HomeWorld key={f} faction={f} x={x} y={y} state={st} selected={selId === id} threat={events.has(id)} onClick={() => clickRegion(id)} />;
+        })}
 
         {/* Events: a warning triangle for a defense, a target on a home world under attack. */}
         <g className="markers">
           {[...events.entries()].map(([id, ev]) => {
             const shape = id === "superearth" ? null : REGIONS.find((r) => r.id === id);
-            const [x, y] = shape ? (shape.index >= 11 ? polar((ringRadius(10) + ringRadius(11)) / 2, FRONT_MID[shape.faction]) : shape.center) : [0, -SUPER_EARTH_R - 30];
-            const left = ev.end_time - nowUnix;
+            const [x, y] = shape ? (shape.index >= 11 ? polar(ringRadius(11) + 6, FRONT_MID[shape.faction]) : shape.center) : [0, -SUPER_EARTH_R - 30];
             const attack = ev.region >= 11;
             return (
               <g key={ev.event_id} className={`marker ${attack ? "attack" : "defend"}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${markK.toFixed(2)})`} data-region={id} onClick={() => clickRegion(id)}>
@@ -310,10 +329,6 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
                 {attack
                   ? <g className="marker-icon"><circle r="13" /><path d="M0 -20V-6M0 6V20M-20 0H-6M6 0H20" /></g>
                   : <g className="marker-icon"><path d="M0 -17L16 11H-16Z" /><path d="M0 -6V2M0 5.5V7.5" className="mark" /></g>}
-                <g transform="translate(0 30)">
-                  <rect x="-40" y="-11" width="80" height="20" className="marker-tag" />
-                  <text y="4" className="marker-time">{clock(left, false)}</text>
-                </g>
               </g>
             );
           })}
@@ -325,6 +340,61 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     </div>
   );
 });
+
+/** The gradients of the home world spheres. Each faction has its own surface: the Bugs a mottled hive
+    world, the Cyborgs an industrial world in bands, the Illuminates a smooth world in a ring of light. */
+const HomeDefs = memo(function HomeDefs() {
+  return (
+    <>
+      <radialGradient id="hw-bugs" cx="38%" cy="34%" r="72%">
+        <stop offset="0%" stopColor="#d9ffe9" />
+        <stop offset="30%" stopColor="#5fd6a2" />
+        <stop offset="72%" stopColor="#1d6b4f" />
+        <stop offset="100%" stopColor="#0b2a20" />
+      </radialGradient>
+      <radialGradient id="hw-cyborgs" cx="38%" cy="34%" r="72%">
+        <stop offset="0%" stopColor="#ffe0d6" />
+        <stop offset="30%" stopColor="#e8644a" />
+        <stop offset="72%" stopColor="#7a1d14" />
+        <stop offset="100%" stopColor="#2a0805" />
+      </radialGradient>
+      <radialGradient id="hw-illuminates" cx="38%" cy="34%" r="72%">
+        <stop offset="0%" stopColor="#e6f0ff" />
+        <stop offset="30%" stopColor="#5b98ff" />
+        <stop offset="72%" stopColor="#1a3f9e" />
+        <stop offset="100%" stopColor="#081638" />
+      </radialGradient>
+      <radialGradient id="hw-shade" cx="35%" cy="30%" r="80%">
+        <stop offset="55%" stopColor="rgba(0, 0, 0, 0)" />
+        <stop offset="100%" stopColor="rgba(0, 0, 0, 0.55)" />
+      </radialGradient>
+      <clipPath id="hw-clip"><circle r={HW_R} /></clipPath>
+    </>
+  );
+});
+
+const HW_R = 25;
+
+function HomeWorld({ faction, x, y, state, selected, threat, onClick }: { faction: Faction; x: number; y: number; state: RegionState; selected: boolean; threat: boolean; onClick: () => void }) {
+  const r = HW_R;
+  return (
+    <g className={`home-world ${faction} ${state}${selected ? " sel" : ""}${threat ? " threat" : ""}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`} data-region={`${faction}:11`} onClick={onClick}>
+      <circle r={r * 1.7} className="hw-glow" />
+      {faction === "illuminates" && <ellipse rx={r * 1.65} ry={r * 0.42} transform="rotate(-18)" className="hw-ring back" />}
+      <circle r={r} fill={`url(#hw-${faction})`} className="hw-core" />
+      <g clipPath="url(#hw-clip)" className="hw-surface">
+        {faction === "bugs" && <>
+          <circle cx={-7} cy={-4} r={6} /><circle cx={6} cy={7} r={4.5} /><circle cx={9} cy={-9} r={3} /><circle cx={-4} cy={12} r={3.2} /><circle cx={-14} cy={6} r={2.4} />
+        </>}
+        {faction === "cyborgs" && <path d={`M${-r} -9H${r}M${-r} -2H${r}M${-r} 5H${r}M${-r} 12H${r}M-6 ${-r}V${r}M7 ${-r}V${r}`} />}
+        {faction === "illuminates" && <circle r={r * 0.55} className="hw-eye" />}
+      </g>
+      <circle r={r} fill="url(#hw-shade)" pointerEvents="none" />
+      {faction === "illuminates" && <path d={`M${(-r * 1.65).toFixed(1)} 0A${(r * 1.65).toFixed(1)} ${(r * 0.42).toFixed(1)} 0 0 0 ${(r * 1.65).toFixed(1)} 0`} transform="rotate(-18)" className="hw-ring front" />}
+      <circle r={r + 4} className="hw-sel" />
+    </g>
+  );
+}
 
 function clampView(v: { x: number; y: number; w: number; h: number }) {
   const maxX = FULL.x + FULL.w - v.w, maxY = FULL.y + FULL.h - v.h;

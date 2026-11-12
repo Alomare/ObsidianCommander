@@ -6,23 +6,20 @@ import { useNow, useTween, useWarData } from "../hooks";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";
 import { clock, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
-import { evoOf } from "../evolved";
 import { FACTION_ACCENT, GalaxyMap, HELLDIVER_ACCENT, type Selection } from "../map/GalaxyMap";
 import { CommandPanel } from "./CommandPanel";
-import { EvolvedBody } from "./EvolvedView";
-import { EvolvedSettingsDialog } from "./EvolvedSettings";
-import { FeedList, PlayersPanel, SettingsDialog, StatsPanel } from "./Panels";
-import { EnemyIcon, IBack, ICheck, IEdit, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, IGlobe, ILan, IList, IMore, IShare, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
+import { FeedList, PlayersPanel, StatsPanel } from "./Panels";
+import { EnemyIcon, IBack, ICheck, IClockPause, IClockResume, ICommand, IEye, IExport, IGear, IGlobe, ILan, IList, IMore, IShare, IStats, ITarget, ITrash, IUsers, IWarn } from "./Icons";
 import { ShareDialog } from "./ShareDialog";
 import { Confirm, MenuButton, Seg, notify } from "./ui";
-import { WarInfoDialog } from "./WarInfo";
+import { WarSettingsDialog } from "./WarInfo";
 
 type Tab = "command" | "feed" | "players" | "stats";
 const TABS: Tab[] = ["command", "feed", "players", "stats"];
 export type SeasonAsk = "end" | "new";
 
 /** Mock only, for screenshots: `&sel=bugs:4` (or `superearth`) selects a region, `&tab=feed` opens a tab,
-    `&dialog=share` opens Share. */
+    `&dialog=share` or `&dialog=settings` opens that dialog. */
 const mockStart = (() => {
   const q = new URLSearchParams(location.search);
   const sel = isMock ? q.get("sel") : null;
@@ -34,7 +31,8 @@ const mockStart = (() => {
     if (enemy >= 0) s = r ? { kind: "region", enemy, region: Number(r) } : { kind: "front", enemy };
   }
   const tab = (isMock && TABS.includes(q.get("tab") as Tab) ? q.get("tab") : "command") as Tab;
-  return { sel: s, tab, share: isMock && q.get("dialog") === "share" };
+  const d = isMock ? q.get("dialog") : null;
+  return { sel: s, tab, dialog: d === "share" || d === "settings" ? (d as "share" | "settings") : null };
 })();
 const SPEEDS = [0.5, 1, 2, 5, 10];
 
@@ -44,7 +42,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const now = useNow(1000);
   const [selection, setSelection] = useState<Selection>(mockStart.sel);
   const [tab, setTab] = useState<Tab>(mockStart.tab);
-  const [dialog, setDialog] = useState<null | "settings" | "info" | "delete" | "share" | SeasonAsk>(mockStart.share ? "share" : null);
+  const [dialog, setDialog] = useState<null | "settings" | "delete" | "share" | SeasonAsk>(mockStart.dialog);
   const [result, setResult] = useState<"won" | "lost">("won");
 
   /** A Game Master action; true when the server took it. */
@@ -92,7 +90,6 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
   const serverNow = now / 1000 + offset;
   const nowUnix = running ? serverNow : war.server_time;
   const isPlaying = host.playing === war.id;
-  const evo = evoOf(war);
 
   const exportWar = async () => {
     try {
@@ -118,7 +115,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
 
   const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: "command", label: readOnly ? t("overview") : t("command"), icon: readOnly ? <IEye /> : <ICommand /> },
-    { id: "feed", label: evo ? t("dispatches") : t("feed"), icon: <IList /> },
+    { id: "feed", label: t("feed"), icon: <IList /> },
     { id: "players", label: t("players"), icon: <IUsers /> },
     { id: "stats", label: t("statistics"), icon: <IStats /> },
   ];
@@ -138,9 +135,9 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
       <header className="war-bar">
         {!guest && <button className="btn icon" onClick={onBack} aria-label={t("back")} data-tip={t("back")}><IBack /></button>}
         <div className="war-title">
-          <h1 title={war.name}>{war.name}</h1>
+          <h1 data-tip={war.name}>{war.name}</h1>
           <div className="wc-chips">
-            {war.model !== "vanilla" && <span className="chip model">{war.model === "evolved" ? t("modelEvolvedShort") : war.model}</span>}
+            {war.model === "enhanced" && <span className="chip model enhanced">{t("modelEnhancedShort")}</span>}
             <span className="chip" data-tip={t("seasonTip")}>{t("seasonN", { n: war.season })}</span>
             <span className={`chip state ${war.state}`}>{tk(`state_${war.state}`)}</span>
             {readOnly && <span className="chip ro" data-tip={t("readOnlyTip")}><IEye width={13} height={13} />{t("readOnly")}</span>}
@@ -159,9 +156,8 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
             <button className="btn go share-btn" onClick={() => setDialog("share")} aria-label={t("share")} data-tip-title={t("share")} data-tip={t("shareTip")}>
               <IShare /><span>{t("share")}</span>
             </button>
-            <button className="btn icon" onClick={() => setDialog("settings")} aria-label={t("settings")} data-tip={t("settings")}><IGear /></button>
+            <button className="btn icon" onClick={() => setDialog("settings")} aria-label={t("warSettings")} data-tip={t("warSettings")}><IGear /></button>
             <MenuButton label={t("more")} icon={<IMore />} items={[
-              { label: t("editInfo"), icon: <IEdit />, run: () => setDialog("info") },
               { label: t("exportWar"), icon: <IExport />, run: exportWar },
               { label: t("deleteWar"), icon: <ITrash />, danger: true, run: () => setDialog("delete") },
             ]} />
@@ -174,9 +170,6 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
         </div>
       </header>
 
-      {evo ? (
-        <EvolvedBody war={war} evo={evo} readOnly={readOnly} run={runOk} nowUnix={nowUnix} serverNow={serverNow} tab={tab} setTab={setTab} tabsNav={tabsNav} />
-      ) : (
       <div className="war-body">
         <div className="map-col">
           <div className="map-stage">
@@ -211,13 +204,9 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
           </div>
         </aside>
       </div>
-      )}
 
       {error && <div className="banner floating">{t("offline")}</div>}
-      {dialog === "settings" && (evo
-        ? <EvolvedSettingsDialog war={war} settings={evo.settings} onClose={() => setDialog(null)} onSaved={accept} />
-        : <SettingsDialog war={war} onClose={() => setDialog(null)} onSaved={accept} />)}
-      {dialog === "info" && <WarInfoDialog war={war} onClose={() => setDialog(null)} onSaved={accept} />}
+      {dialog === "settings" && <WarSettingsDialog war={war} onClose={() => setDialog(null)} onSaved={accept} />}
       {dialog === "delete" && (
         <Confirm title={t("deleteWar")} text={t("deleteWarText", { name: war.name })} okLabel={t("delete")} danger onClose={() => setDialog(null)}
           onOk={async () => { try { await api.deleteWar(war.id); onBack(); } catch (e) { notify(e instanceof Error ? e.message : String(e), true); } }} />
@@ -250,7 +239,7 @@ function WarClock({ war, serverNow, readOnly, run }: { war: War; serverNow: numb
         <b className="mono">{clock(wt)}</b>
       </div>
       {!readOnly && !ended && (
-        <button className={`btn icon clock-btn${running ? "" : " paused"}`} onClick={() => run({ action: running ? "pause" : "resume" })} aria-label={running ? t("pause") : t("resume")} data-tip={`${running ? t("pause") : t("resume")} (Space)`}>
+        <button className={`btn icon clock-btn ${running ? "to-pause" : "to-resume"}`} onClick={() => run({ action: running ? "pause" : "resume" })} aria-label={running ? t("pause") : t("resume")} data-tip={`${running ? t("pause") : t("resume")} (Space)`}>
           {running ? <IClockPause /> : <IClockResume />}
         </button>
       )}
@@ -272,7 +261,7 @@ function FrontCard({ front, names, selected, event, onClick }: { front: Front; n
   // A front not in the war shows an empty bar: the points it keeps for later aren't progress anyone sees.
   const total = useTween(front.status === "defeated" ? 1 : front.status === "hidden" ? 0 : front.points / front.points_max);
   const cur = regionOf(front);
-  const where = front.status === "active" ? `${t("regionOf", { n: cur })} · ${regionName(front.enemy, cur, names)}` : tk(`status_${front.status}`);
+  const where = front.status === "active" ? regionName(front.enemy, cur, names) : tk(`status_${front.status}`);
   return (
     <button className={`front-card ${front.status}${selected ? " sel" : ""}`} onClick={onClick} style={{ "--fc": FACTION_ACCENT[f], "--hd": HELLDIVER_ACCENT } as CSSProperties}
       aria-pressed={selected}>
@@ -330,6 +319,7 @@ function Legend({ hidden }: { hidden: boolean }) {
       <span><i className="lg liberated" />{t("legendLiberated")}</span>
       <span><i className="lg front" />{t("legendFront")}</span>
       <span><i className="lg enemy" />{t("legendEnemy")}</span>
+      <span><i className="lg home" />{t("legendHome")}</span>
       {hidden && <span><i className="lg hidden" />{t("legendHidden")}</span>}
     </div>
   );
