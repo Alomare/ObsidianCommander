@@ -197,6 +197,7 @@ Messages with `window.postMessage`. The interface only acts on messages from the
 | `commander:play` | `war`, `name` | selects that war for play: creates a Sandbox save for the war on first use, selects that save, then starts the game |
 | `commander:select` | `war`, `name` | selects that war for play without starting the game |
 | `commander:official` | | goes back to the official war |
+| `commander:lan` | `open` (boolean) | a war on this PC opened to LAN (`true`) or closed (`false`). On Linux, when a firewall (firewalld or ufw) shuts the LAN ports, Obsidian offers to open TCP 17494 to 17499 and UDP 17493 with the system password prompt, and records them; Remove All Commander Data closes them. Windows asks the player by itself |
 | `commander:created` | `war`, `name`, `model` | a war was created; for `model: "evolved"`, Obsidian installs the newest Evolved War Engine release when missing and enables it in the active profile. Selecting an Evolved war does the same |
 | `commander:ready` | | the interface loaded; Obsidian answers with `obsidian:hello` |
 

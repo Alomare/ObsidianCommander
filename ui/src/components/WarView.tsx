@@ -1,7 +1,7 @@
 // The war: the galaxy overview as the hero, the fronts under it, the clock and tools above, the side panel.
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { api, isMock } from "../api";
-import { playModel, selectWar, useHost } from "../bridge";
+import { lanChanged, playModel, selectWar, useHost } from "../bridge";
 import { useNow, useTween, useWarData } from "../hooks";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";
@@ -110,6 +110,7 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
     try {
       const lan = await api.lan(war.id, open, internet, newInvite);
       accept({ ...war, lan });
+      if (lan.open !== war.lan.open) lanChanged(lan.open);
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e), true);
     }

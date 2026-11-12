@@ -113,6 +113,11 @@ export function selectWar(war: string, name: string, model?: PlayModel) {
 export function warCreated(war: string, name: string, model?: PlayModel) {
   post({ type: "commander:created", war, name, ...(model ? { model } : {}) });
 }
+/** A war opened to LAN or closed. On Linux, Obsidian offers to open the LAN ports in a firewall that
+    shuts them; older launchers ignore the message. */
+export function lanChanged(open: boolean) {
+  post({ type: "commander:lan", open });
+}
 export function officialWar() {
   post({ type: "commander:official" });
   if (isMock && !embedded) set({ playing: null, gameRunning: false });

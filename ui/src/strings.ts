@@ -178,7 +178,7 @@ const en = {
   shareOpenInternet: "Open to LAN and Internet on port {port}",
   lan: "Open to LAN",
   lanShort: "LAN",
-  lanText: "Players on this network see the war under Join War in Obsidian and join without a code. The first time, Windows may ask to let the war server through the firewall: allow it on private networks.",
+  lanText: "Players on this network see the war under Join War in Obsidian and join without a code. The first time, Windows may ask to let the war server through the firewall: allow it on private networks. On Linux, Obsidian offers to open the ports when a firewall shuts them.",
   lanPort: "Port {port}",
   lanClosed: "Closed",
   internet: "Open to Internet",
