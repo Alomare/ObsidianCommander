@@ -54,7 +54,7 @@ export const FACTION_ACCENT: Record<Faction, string> = {
 export const HELLDIVER_ACCENT = "rgb(255, 170, 20)";
 
 // A little room around the rings for the event rings and the home world spheres.
-const PAD = 30;
+const PAD = 62;
 const FULL = { x: -OUTER_R - PAD, y: -OUTER_R - PAD, w: (OUTER_R + PAD) * 2, h: (OUTER_R + PAD) * 2 };
 type View = typeof FULL;
 /** Mock only, for screenshots: `&zoom=2` starts zoomed in twice on the middle. */
@@ -196,10 +196,10 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
     const index = Number(i);
     const front = war.fronts.find((x) => x.enemy === enemy);
     const st = regionState(war, enemy, index);
-    const lines = [index >= 11 ? `${t("frontOf", { enemy: enemyName(enemy) })} Â· ${t("homeWorldState")}` : t("frontOf", { enemy: enemyName(enemy) })];
-    lines.push(st === "liberated" ? t("liberated") : st === "front" ? `${t("contested")} Â· ${pct(front ? regionProgress(front) : 0)}` : st === "hidden" ? t("hidden") : st === "home" ? t("homeWorldState") : t("enemyHeld"));
+    const lines = [index >= 11 ? `${t("frontOf", { enemy: enemyName(enemy) })} · ${t("homeWorldState")}` : t("frontOf", { enemy: enemyName(enemy) })];
+    lines.push(st === "liberated" ? t("liberated") : st === "front" ? `${t("contested")} · ${pct(front ? regionProgress(front) : 0)}` : st === "hidden" ? t("hidden") : st === "home" ? t("homeWorldState") : t("enemyHeld"));
     const ev = events.get(id);
-    if (ev) lines.push(`${ev.region >= 11 ? t("attackOn", { region: "" }).trim() : t("defense")} Â· ${pct(ev.points / ev.points_max)} Â· ${clock(ev.end_time - nowUnix)}`);
+    if (ev) lines.push(`${ev.region >= 11 ? t("attackOn", { region: "" }).trim() : t("defense")} · ${pct(ev.points / ev.points_max)} · ${clock(ev.end_time - nowUnix)}`);
     return { title: regionName(enemy, index, names), lines };
   }, [events, names, nowUnix, war]);
 
@@ -313,7 +313,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
           const shape = REGIONS.find((r) => r.id === id);
           if (!shape) return null;
           const st = regionState(war, FACTION_OF.indexOf(f), 11);
-          const [x, y] = polar((ringRadius(10) + ringRadius(11)) / 2, FRONT_MID[f]);
+          const [x, y] = polar((ringRadius(10) + ringRadius(11)) / 2 + HW_OUT, FRONT_MID[f]);
           return <HomeWorld key={f} faction={f} x={x} y={y} state={st} selected={selId === id} threat={events.has(id)} onClick={() => clickRegion(id)} />;
         })}
 
@@ -321,7 +321,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
         <g className="markers">
           {[...events.entries()].map(([id, ev]) => {
             const shape = id === "superearth" ? null : REGIONS.find((r) => r.id === id);
-            const [x, y] = shape ? (shape.index >= 11 ? polar(ringRadius(11) + 6, FRONT_MID[shape.faction]) : shape.center) : [0, -SUPER_EARTH_R - 30];
+            const [x, y] = shape ? (shape.index >= 11 ? polar((ringRadius(10) + ringRadius(11)) / 2 + HW_OUT, FRONT_MID[shape.faction]) : shape.center) : [0, -SUPER_EARTH_R - 30];
             const attack = ev.region >= 11;
             return (
               <g key={ev.event_id} className={`marker ${attack ? "attack" : "defend"}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${markK.toFixed(2)})`} data-region={id} onClick={() => clickRegion(id)}>
@@ -341,56 +341,43 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
   );
 });
 
-/** The gradients of the home world spheres. Each faction has its own surface: the Bugs a mottled hive
-    world, the Cyborgs an industrial world in bands, the Illuminates a smooth world in a ring of light. */
+/** The gradients of the home world spheres: plain spheres, one colour each, lit from the top left. */
 const HomeDefs = memo(function HomeDefs() {
   return (
     <>
       <radialGradient id="hw-bugs" cx="38%" cy="34%" r="72%">
-        <stop offset="0%" stopColor="#d9ffe9" />
+        <stop offset="0%" stopColor="#8be8c0" />
         <stop offset="30%" stopColor="#5fd6a2" />
         <stop offset="72%" stopColor="#1d6b4f" />
         <stop offset="100%" stopColor="#0b2a20" />
       </radialGradient>
       <radialGradient id="hw-cyborgs" cx="38%" cy="34%" r="72%">
-        <stop offset="0%" stopColor="#ffe0d6" />
+        <stop offset="0%" stopColor="#f59a85" />
         <stop offset="30%" stopColor="#e8644a" />
         <stop offset="72%" stopColor="#7a1d14" />
         <stop offset="100%" stopColor="#2a0805" />
       </radialGradient>
       <radialGradient id="hw-illuminates" cx="38%" cy="34%" r="72%">
-        <stop offset="0%" stopColor="#e6f0ff" />
+        <stop offset="0%" stopColor="#8db8ff" />
         <stop offset="30%" stopColor="#5b98ff" />
         <stop offset="72%" stopColor="#1a3f9e" />
         <stop offset="100%" stopColor="#081638" />
       </radialGradient>
-      <radialGradient id="hw-shade" cx="35%" cy="30%" r="80%">
-        <stop offset="55%" stopColor="rgba(0, 0, 0, 0)" />
-        <stop offset="100%" stopColor="rgba(0, 0, 0, 0.55)" />
-      </radialGradient>
-      <clipPath id="hw-clip"><circle r={HW_R} /></clipPath>
     </>
   );
 });
 
-const HW_R = 25;
+/** Twice the first size: the inner edge stays inside the home world sector and the sphere runs out past the rings. */
+export const HW_R = 50;
+/** How far the sphere centre sits out from the middle of the home world sector. */
+export const HW_OUT = 25;
 
+/** A plain sphere in the faction colour, with no surface details. */
 function HomeWorld({ faction, x, y, state, selected, threat, onClick }: { faction: Faction; x: number; y: number; state: RegionState; selected: boolean; threat: boolean; onClick: () => void }) {
   const r = HW_R;
   return (
     <g className={`home-world ${faction} ${state}${selected ? " sel" : ""}${threat ? " threat" : ""}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`} data-region={`${faction}:11`} onClick={onClick}>
-      <circle r={r * 1.7} className="hw-glow" />
-      {faction === "illuminates" && <ellipse rx={r * 1.65} ry={r * 0.42} transform="rotate(-18)" className="hw-ring back" />}
       <circle r={r} fill={`url(#hw-${faction})`} className="hw-core" />
-      <g clipPath="url(#hw-clip)" className="hw-surface">
-        {faction === "bugs" && <>
-          <circle cx={-7} cy={-4} r={6} /><circle cx={6} cy={7} r={4.5} /><circle cx={9} cy={-9} r={3} /><circle cx={-4} cy={12} r={3.2} /><circle cx={-14} cy={6} r={2.4} />
-        </>}
-        {faction === "cyborgs" && <path d={`M${-r} -9H${r}M${-r} -2H${r}M${-r} 5H${r}M${-r} 12H${r}M-6 ${-r}V${r}M7 ${-r}V${r}`} />}
-        {faction === "illuminates" && <circle r={r * 0.55} className="hw-eye" />}
-      </g>
-      <circle r={r} fill="url(#hw-shade)" pointerEvents="none" />
-      {faction === "illuminates" && <path d={`M${(-r * 1.65).toFixed(1)} 0A${(r * 1.65).toFixed(1)} ${(r * 0.42).toFixed(1)} 0 0 0 ${(r * 1.65).toFixed(1)} 0`} transform="rotate(-18)" className="hw-ring front" />}
       <circle r={r + 4} className="hw-sel" />
     </g>
   );

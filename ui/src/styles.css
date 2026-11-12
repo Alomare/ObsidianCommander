@@ -234,7 +234,7 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .list-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; min-height: 2.4rem; }
 .list-tools { margin-left: auto; display: flex; gap: 0.5rem; }
 .war-cards { display: flex; flex-direction: column; gap: 0.55rem; }
-.war-card { display: grid; grid-template-columns: 9rem minmax(0, 1fr) 8rem 1.1rem; align-items: center; gap: 1.4rem; padding: 0.9rem 1.6rem; cursor: pointer;
+.war-card { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) 8rem 1.1rem; align-items: center; gap: 1.4rem; padding: 0.9rem 1.6rem; cursor: pointer;
   --edge: transparent; --p-top: var(--p1);
   background: var(--edge-corners), linear-gradient(160deg, var(--p-top), var(--p2)); background-origin: border-box;
   box-shadow: inset 3px 0 0 transparent, inset 0 0 0 1px transparent; transition: background var(--fast), box-shadow var(--fast); animation: rise var(--enter) ease-out backwards; }
@@ -262,13 +262,12 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .empty-card .skull { width: 6rem; height: 6rem; opacity: 0.9; }
 .empty-card p { max-width: 30rem; color: var(--mu); line-height: 1.5; }
 .wc-desc { color: var(--mu); font-size: var(--fs-md); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-/* The war logo: the picture the host chose, or the logo of the model, on a dark plate in both themes. */
-.war-logo { display: grid; place-items: center; width: 100%; aspect-ratio: 2 / 1; padding: 0.45rem 0.6rem; overflow: hidden;
-  background: radial-gradient(circle at 50% 40%, #141a28, var(--space1) 70%, var(--space2)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+/* The war logo: the picture the host chose, or the skull of the model, square and on no plate. */
+.war-logo { display: grid; place-items: center; width: 100%; aspect-ratio: 1 / 1; padding: 0.2rem; overflow: hidden; background: transparent; }
 .war-logo img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; -webkit-user-drag: none; }
 .war-logo .skull { display: block; height: 100%; width: auto; max-width: 100%; }
-.war-logo.own { padding: 0.2rem; }
-.war-logo.big { width: 13rem; flex: none; }
+.war-logo.own { padding: 0; }
+.war-logo.big { width: 8rem; flex: none; }
 .modal.info-dialog { width: min(38rem, 92vw); }
 .logo-edit { display: flex; align-items: center; gap: 1rem; }
 .logo-side { min-width: 0; display: flex; flex-direction: column; gap: 0.6rem; }
@@ -297,8 +296,7 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
   --edge: color-mix(in srgb, var(--gold) 60%, transparent); --edge-tl: var(--gold); --edge-tl-w: 3px; --fill: color-mix(in srgb, var(--gold) 12%, transparent);
   box-shadow: inset 0 0 0 1px var(--edge), inset 3px 0 0 var(--gold); }
 .model-card:disabled { cursor: default; opacity: 0.6; }
-.mc-logo { flex: none; width: 8.5rem; aspect-ratio: 2 / 1; display: grid; place-items: center; padding: 0.4rem 0.55rem;
-  background: radial-gradient(circle at 50% 40%, #141a28, var(--space1) 70%, var(--space2)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.mc-logo { flex: none; width: 4.5rem; aspect-ratio: 1 / 1; display: grid; place-items: center; padding: 0.2rem; background: transparent; }
 .mc-logo img { display: block; max-width: 100%; max-height: 100%; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)); -webkit-user-drag: none; }
 /* A note in a form: gold bar on the left, the title on a separate line. */
 .info-box { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.75rem 0.9rem; color: var(--tx); font-size: var(--fs-md); line-height: 1.45;
@@ -451,15 +449,8 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .home-world { cursor: pointer; --hw: rgba(120, 240, 190, 0.9); }
 .home-world.cyborgs { --hw: rgba(255, 120, 95, 0.9); }
 .home-world.illuminates { --hw: rgba(110, 170, 255, 0.95); }
-.hw-glow { fill: var(--hw); opacity: 0.16; filter: blur(6px); pointer-events: none; }
-.hw-core { filter: drop-shadow(0 0 8px var(--hw)); transition: filter var(--fast); }
-.home-world:hover .hw-core { filter: drop-shadow(0 0 14px var(--hw)) brightness(1.12); }
-.hw-surface { pointer-events: none; }
-.home-world.bugs .hw-surface circle { fill: rgba(6, 40, 26, 0.5); stroke: rgba(170, 255, 210, 0.25); stroke-width: 0.8; }
-.home-world.cyborgs .hw-surface path { fill: none; stroke: rgba(30, 4, 2, 0.55); stroke-width: 1.6; }
-.home-world.illuminates .hw-eye { fill: rgba(200, 225, 255, 0.28); stroke: rgba(230, 242, 255, 0.55); stroke-width: 1; }
-.hw-ring { fill: none; stroke: rgba(150, 195, 255, 0.85); stroke-width: 2; pointer-events: none; }
-.hw-ring.back { stroke-opacity: 0.35; }
+.hw-core { transition: filter var(--fast); }
+.home-world:hover .hw-core { filter: brightness(1.15); }
 .hw-sel { fill: none; stroke: transparent; stroke-width: 2.2; pointer-events: none; }
 .home-world.sel .hw-sel { stroke: #fff; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)); }
 .home-world.threat .hw-sel { stroke: #ff5a4a; stroke-dasharray: 5 3; }
