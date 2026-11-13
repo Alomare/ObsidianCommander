@@ -1,5 +1,6 @@
 //! The war API the game calls (`POST /w/<id>/1.0/`, form-encoded `action=...`), per docs/protocol.md.
 
+use crate::boards;
 use crate::rules::{ENEMIES, Out, War, mix64};
 use crate::store::WarSlot;
 use serde_json::{Map, Value, json};
@@ -285,7 +286,7 @@ pub fn handle(
             let trials: Vec<Value> = (0..ENEMIES)
                 .map(|e| {
                     json!({"enemy": e, "trial_seed": 1_000_000 + (seed_for(war, e, 1) % 100_000),
-                           "mission_seed": seed_for(war, e, 2) % 2_000_000_000, "unlocked": 1})
+                           "mission_seed": boards::trial_mission_seed(seed_for(war, e, 2), e), "unlocked": 1})
                 })
                 .collect();
             m.insert("trials".into(), Value::Array(trials));
@@ -293,9 +294,17 @@ pub fn handle(
         }
 
         "get_leaderboards" | "get_leaderboards_provinggrounds" => {
+            let season = season_param.unwrap_or(war.season);
+            let count = int_field(fields, "count").filter(|c| *c > 0).unwrap_or(10) as usize;
+            let users = boards::users(fields.get("users"));
+            let (top, mine) = if action == "get_leaderboards" {
+                boards::heroes(war, season, count, &users)
+            } else {
+                boards::trials(war, season, count, &users)
+            };
             let mut m = base(now);
-            m.insert("leaderboards".into(), json!([]));
-            m.insert("user_leaderboards".into(), json!([]));
+            m.insert("leaderboards".into(), top);
+            m.insert("user_leaderboards".into(), mine);
             m
         }
         "get_top_of_leaderboard_provinggrounds" => {
@@ -348,12 +357,22 @@ pub fn handle(
             let Some(rows) = json_rows(fields, "statistics") else {
                 return (error_answer(now), out);
             };
-            let kind = if action == "upload_leaderboard_statistics" {
+            let heroes = action == "upload_leaderboard_statistics";
+            let kind = if heroes {
                 "leaderboard"
             } else {
                 "leaderboard_provinggrounds"
             };
-            let ack = take_rows(war, player, kind, rows, |_, _| {});
+            let ack = take_rows(war, player, kind, rows, |w, r| {
+                if !row_season_ok(w, r) {
+                    return;
+                }
+                if heroes {
+                    boards::add_hero(w, player, r);
+                } else {
+                    boards::add_trial(w, player, r);
+                }
+            });
             out.changed = true;
             let mut m = base(now);
             if let Some(a) = ack {

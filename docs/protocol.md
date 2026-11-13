@@ -29,8 +29,8 @@ A custom server must not keep or forward `data`. The probe server logs only the 
 | `get_attack_event_by_id` | `event_id` | `attack_event` | H |
 | `get_season_statistics` | `season` | `statistics` | V |
 | `get_provinggrounds` | | `trials[] {enemy, trial_seed, mission_seed, unlocked}` | V |
-| `get_leaderboards` | `count`, `season`, `network`, `users` (JSON) | `leaderboards`, `user_leaderboards` | H |
-| `get_leaderboards_provinggrounds` | same | same | H |
+| `get_leaderboards` | `count`, `season`, `network`, `users` (JSON) | `leaderboards`, `user_leaderboards`: four lists each (bugs, cyborgs, illuminates, the whole war) of `{online_id, score, planets, playtime, player_xp}`. `MenuScreenCampaign.draw_leaderboard` indexes the list of the selected tab without a check: an empty answer crashed the game on the Heroes tab (2026-11-13) | V |
+| `get_leaderboards_provinggrounds` | same | one list per front of `{online_id_1..online_id_4, completion_time, influence, playtime}`; the game joins the four ids into the squad name, so a missing one is `""` (`state_menu.lua:2520-2600`) | H |
 | `get_top_of_leaderboard_provinggrounds` | `season`, `network` | `experts` | H |
 | `get_usernames` | `count`, `network` | `usernames[]` (hex Steam IDs) | V |
 | `get_available_entitlements` | | `entitlements[] {name, available}`. Changes only which store entries the armory lists | V |

@@ -425,6 +425,12 @@ pub struct War {
     /// A placeholder for now.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enhanced: Option<Enhanced>,
+    /// Heroes of the Federation: the totals each player uploaded, per season and front.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub heroes: Vec<crate::boards::HeroRow>,
+    /// The Proving Grounds board: each squad, per season and front.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trials: Vec<crate::boards::TrialRow>,
 }
 
 /// What an Enhanced war adds to the Vanilla war. Only a version for now.
@@ -571,6 +577,8 @@ impl War {
             season_start_time: now,
             last_snapshot_hour: 0,
             enhanced: None,
+            heroes: vec![],
+            trials: vec![],
         };
         let mut out = Out {
             snapshot: true,

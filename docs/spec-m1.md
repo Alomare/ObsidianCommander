@@ -79,14 +79,16 @@ Every answer is JSON with `time` (server unix time) and `error_code` (0). Unknow
 | `get_snapshots` | `introduction_order[3]`, `points_max[3]`, `snapshots[] {season, time, data}` where **`data` is a JSON string** of three `{points, points_taken, status}`, `defend_events[]`, `attack_events[]`. Honour `start` and `end` |
 | `get_defend_event_by_id`, `get_attack_event_by_id` | the event |
 | `get_season_statistics` | `statistics` |
-| `get_provinggrounds` | `trials[]`: three entries `{enemy, trial_seed, mission_seed, unlocked}`, seeds from the war seed |
-| `get_leaderboards`, `get_leaderboards_provinggrounds` | empty `leaderboards`, `user_leaderboards` |
+| `get_provinggrounds` | `trials[]`: three entries `{enemy, trial_seed, mission_seed, unlocked}`, seeds from the war seed. The mission seed decodes as the game reads it: the hundreds digit is the front, the last two digits 60 to 79 (Proving Grounds, difficulty 5, 9 or 15) |
+| `get_leaderboards` | `leaderboards`: four lists, one per front then the whole war, each `{online_id, score, planets, playtime, player_xp}` best score first, at most `count`; `user_leaderboards`: the same four lists with the rows of the `users`. **Never fewer than four lists**: the war screen indexes them without a check and stops the game on a missing one |
+| `get_leaderboards_provinggrounds` | `leaderboards`: three lists, one per front, each `{online_id_1..online_id_4, completion_time, influence, playtime, trial_seed, mission_seed}` fastest first (an empty id is `""`, no time is 99999); `user_leaderboards`: per front the best squad of the first of the `users` that has one |
 | `get_top_of_leaderboard_provinggrounds` | empty `experts` |
 | `get_usernames` | `usernames[]`: the Steam IDs of the war members |
 | `get_available_entitlements` | an empty `entitlements` list (store listings only; never unlock paid content) |
 | `upload_statistics` (`statistics` JSON) | add to the war statistics; ack `uploaded_statistics` = highest `index` |
 | `upload_statistics` with `c` | ack only (the tamper report from the game; ignore it) |
-| `upload_leaderboard_statistics`, `upload_leaderboard_provinggrounds_statistics` | ack the highest `index` |
+| `upload_leaderboard_statistics` | keep the row as the season totals of the player on that front (the game sends totals, so a row replaces the last); ack the highest `index` |
+| `upload_leaderboard_provinggrounds_statistics` | keep the row under the squad (`players`, or the player alone): best time, highest influence and playtime; ack the highest `index` |
 | `complete_planets` (`planets` JSON) | credit the fronts (**`enemy` is 1-based here**), ack `completed_planets` = highest index, and include the new `campaign_status` |
 | `complete_defend_mission` (`event_id`, `difficulty`) | credit the event, answer the full status |
 | `complete_attack_mission` (`event_id`, `difficulty`) | credit the event, answer the full status |

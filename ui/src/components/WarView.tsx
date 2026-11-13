@@ -1,7 +1,7 @@
 // The war: the galaxy overview as the hero, the fronts under it, the clock and tools above, the side panel.
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { api, isMock } from "../api";
-import { lanChanged, playModel, selectWar, useHost } from "../bridge";
+import { lanChanged, useHost } from "../bridge";
 import { useNow, useTween, useWarData } from "../hooks";
 import { t, tk } from "../strings";
 import type { Front, GmAction, War, WarEvent } from "../types";
@@ -163,11 +163,11 @@ export function WarView({ id, readOnly, guest, onBack }: { id: string; readOnly:
             ]} />
           </div>
         )}
-        <div className="play-wrap">
-          {isPlaying
-            ? <button className="btn small selected-btn" disabled data-tip={playTip}><ICheck />{t("playingShort")}</button>
-            : <button className="btn small" disabled={host.gameRunning} onClick={() => selectWar(war.id, war.name, playModel(war.model))} data-tip={host.gameRunning ? t("gameRunningTip") : t("selectTip")}>{t("select")}</button>}
-        </div>
+        {isPlaying && (
+          <div className="play-wrap">
+            <button className="btn small selected-btn" disabled data-tip={playTip}><ICheck />{t("playingShort")}</button>
+          </div>
+        )}
       </header>
 
       <div className="war-body">

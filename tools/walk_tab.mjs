@@ -1,4 +1,4 @@
-// Walks the Obsidian COMMANDER tab in a release exe and takes screenshots, on the model of
+// Walks the Obsidian WARS tab (COMMANDER before Obsidian 2.0) in a release exe and takes screenshots, on the model of
 // ObsidianLauncher internal/tools/walk/walk_exe.mjs (WebView2 debugging port, real mouse events).
 //
 //   OBSIDIAN_EXE=<Obsidian.exe> COMMANDER_ZIP=<package zip> OBSIDIAN_WALK=<scratch folder> node tools/walk_tab.mjs
@@ -121,8 +121,8 @@ async function main() {
     await attach();
     await until(`document.querySelector('.tabs [role=tab]') != null`, "the window", 30000);
     await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1500, height: 900, deviceScaleFactor: 1, mobile: false });
-    await step("Commander tab before the package", async () => {
-      await click(".tabs [role=tab][aria-label=Commander]");
+    await step("Wars tab before the package", async () => {
+      await click(".tabs [role=tab][aria-label=Wars]");
       await until(`document.querySelector('.cmd-intro h1')?.textContent`, "the intro");
       await shot("01-intro");
     });
@@ -150,7 +150,7 @@ async function main() {
         if (!v.installed) throw new Error("not installed");
         await click(".tabs [role=tab][aria-label=Home]");
         await sleep(400);
-        await click(".tabs [role=tab][aria-label=Commander]");
+        await click(".tabs [role=tab][aria-label=Wars]");
       }
       await until(`document.querySelector('iframe.cmd-frame')?.src`, "the frame", 25000);
       server = await invoke("commander_state").then((s) => s.server);
@@ -175,13 +175,13 @@ async function main() {
       await js(`document.documentElement.dataset.theme = 'light'`);
       await click(".tabs [role=tab][aria-label=Home]");
       await sleep(300);
-      await click(".tabs [role=tab][aria-label=Commander]");
+      await click(".tabs [role=tab][aria-label=Wars]");
       await sleep(2500);
       await shot("07-shell-light");
     });
     await step("the package menu, and Remove Package asks first", async () => {
       // The package button sits under the war list: a second click on the tab goes back to the list.
-      await click(".tabs [role=tab][aria-label=Commander]");
+      await click(".tabs [role=tab][aria-label=Wars]");
       await until(`document.querySelector(".cmd-pkg") != null`, "the war list with the package button", 8000);
       await click(".cmd-pkg");
       await until(`document.querySelector('.ctx') != null`, "the menu");

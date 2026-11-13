@@ -371,19 +371,58 @@ fn game_api_answers_like_the_official_server() {
     );
     assert_eq!(r["snapshots"], json!([]));
 
-    // The read actions with no real data still answer.
+    // The read actions answer in the shape the game draws without checks.
     let r = game(h.port, &id, None, &[("action", "get_provinggrounds")]);
     assert_eq!(r["trials"].as_array().unwrap().len(), 3);
     assert!(r["trials"][0]["trial_seed"].is_u64());
-    assert_eq!(
-        game(
-            h.port,
-            &id,
-            None,
-            &[("action", "get_leaderboards"), ("count", "10")]
-        )["leaderboards"],
-        json!([])
+    for (e, t) in r["trials"].as_array().unwrap().iter().enumerate() {
+        let m = t["mission_seed"].as_i64().unwrap();
+        assert_eq!(
+            (m / 100) % 10 % 3,
+            e as i64,
+            "the front is in the hundreds digit"
+        );
+        assert_eq!((m % 100) / 20, 3, "the mission type is Proving Grounds");
+    }
+    // Heroes of the Federation: a list per front and one for the war, with the row uploaded above.
+    let users = json!([PLAYER]).to_string();
+    let r = game(
+        h.port,
+        &id,
+        None,
+        &[
+            ("action", "get_leaderboards"),
+            ("count", "10"),
+            ("season", &season.to_string()),
+            ("users", &users),
+        ],
     );
+    let top = r["leaderboards"].as_array().unwrap();
+    assert_eq!(top.len(), 4);
+    assert_eq!(top[0], json!([]));
+    assert_eq!(top[1][0]["online_id"], PLAYER);
+    assert_eq!(top[1][0]["score"], 1);
+    assert_eq!(top[1][0]["player_xp"], 105);
+    assert_eq!(top[3][0]["playtime"], 19);
+    assert_eq!(r["user_leaderboards"].as_array().unwrap().len(), 4);
+    assert_eq!(r["user_leaderboards"][1][0]["online_id"], PLAYER);
+    // The Proving Grounds board: a list per front, the squad in four id fields.
+    let r = game(
+        h.port,
+        &id,
+        None,
+        &[
+            ("action", "get_leaderboards_provinggrounds"),
+            ("count", "10"),
+            ("season", &season.to_string()),
+            ("users", &users),
+        ],
+    );
+    let top = r["leaderboards"].as_array().unwrap();
+    assert_eq!(top.len(), 3);
+    assert_eq!(top[1][0]["online_id_1"], PLAYER);
+    assert_eq!(top[1][0]["online_id_4"], "");
+    assert_eq!(r["user_leaderboards"][1][0]["online_id_1"], PLAYER);
     assert_eq!(
         game(
             h.port,
