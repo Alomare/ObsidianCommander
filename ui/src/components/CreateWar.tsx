@@ -48,23 +48,23 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
       <form id="create-war" className="create-body" onSubmit={(e) => { e.preventDefault(); if (!busy) create(); }} autoComplete="off">
         <section className="panel create-main">
           <label className="field">
-            <span className="field-label">{t("warName")}</span>
-            <input className="text-field" autoFocus maxLength={64} value={name} placeholder={t("warNamePh")} spellCheck={false} onChange={(e) => setName(e.target.value)} />
+            <span className="create-h cap">{t("warName")}</span>
+            <input className="text-field create-name" autoFocus maxLength={64} value={name} placeholder={t("warNamePh")} spellCheck={false} onChange={(e) => setName(e.target.value)} />
           </label>
 
           <div className="field">
-            <span className="field-label">{t("model")}</span>
+            <span className="create-h cap">{t("model")}</span>
             <div className="model-cards" role="radiogroup" aria-label={t("model")}>
               <button type="button" role="radio" className={`model-card${model === "vanilla" ? " on" : ""}`} aria-checked={model === "vanilla"} onClick={() => setModel("vanilla")}>
-                <span className="mc-logo vanilla"><ModelSkull model="vanilla" size={44} /></span>
+                <span className="mc-logo vanilla"><ModelSkull model="vanilla" size={52} /></span>
                 <span className="mc-text"><b className="cap">{t("modelVanilla")}</b><small>{t("modelVanillaText")}</small></span>
               </button>
               <button type="button" role="radio" className={`model-card${model === "enhanced" ? " on" : ""}`} aria-checked={model === "enhanced"} disabled={!ENHANCED_OPEN}
                 onClick={() => setModel("enhanced")}>
-                <span className="mc-logo enhanced"><ModelSkull model="enhanced" size={44} /></span>
+                <span className="mc-logo enhanced"><ModelSkull model="enhanced" size={52} /></span>
                 <span className="mc-text">
-                  <b className="cap">{t("modelEnhanced")}{!ENHANCED_OPEN && <span className="chip later">{t("comingLater")}</span>}</b>
-                  <small>{t("modelEnhancedText")}</small>
+                  <b className="cap">{t("modelEnhanced")}</b>
+                  {!ENHANCED_OPEN && <span className="chip later">{t("comingLater")}</span>}
                 </span>
               </button>
             </div>
@@ -78,29 +78,29 @@ export function CreateWar({ onCancel, onCreated }: { onCancel: () => void; onCre
           )}
 
           <div className="field">
-            <span className="field-label">{t("preset")}</span>
+            <span className="create-h cap">{t("preset")}</span>
             <div className="preset-cards">
               {PRESET_IDS.map((id) => (
                 <button type="button" key={id} className={`preset-card${preset === id ? " on" : ""}`} aria-pressed={preset === id} onClick={() => setSettings(PRESETS[id])}>
-                  <b>{tk(`preset_${id}`)}</b>
+                  <b className="cap">{tk(`preset_${id}`)}</b>
                   <small>{tk(`presetText_${id}`)}</small>
                   <span className="preset-nums">
-                    <span>{num(PRESETS[id].points_max)} {t("points")}</span>
-                    <span>−{num(PRESETS[id].pressure_per_hour)} / {t("hours")}</span>
-                    <span>{t("defense")} {hoursText(PRESETS[id].defend_duration)}</span>
+                    <span><i>{t("points")}</i>{num(PRESETS[id].points_max)}</span>
+                    <span><i>{t("pressure")}</i>−{num(PRESETS[id].pressure_per_hour)} / {t("hours")}</span>
+                    <span><i>{t("defense")}</i>{hoursText(PRESETS[id].defend_duration)}</span>
                   </span>
                 </button>
               ))}
             </div>
-            <small className="field-note muted">{t("createRulesNote")}</small>
           </div>
         </section>
       </form>
     </div>
     <footer className="create-foot">
       <div className="create-foot-row">
+        <small className="create-note muted">{t("createRulesNote")}</small>
         <button type="button" className="btn" onClick={onCancel}>{t("cancel")}</button>
-        <button type="submit" form="create-war" className="btn play" disabled={busy}><IPlus />{busy ? t("creating") : t("create")}</button>
+        <button type="submit" form="create-war" className="btn go" disabled={busy}><IPlus />{busy ? t("creating") : t("create")}</button>
       </div>
     </footer>
     </div>

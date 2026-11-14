@@ -37,6 +37,7 @@ const en = {
   offline: "No answer from the Commander server. Trying again.",
   playOutside: "Play works inside Obsidian.",
   points: "points",
+  pressure: "Pressure",
   hours: "h",
   more: "More",
 
@@ -83,7 +84,6 @@ const en = {
   modelVanilla: "Vanilla War",
   modelVanillaText: "The HELLDIVERS Galactic Campaign layout: three fronts of ten regions each, with defenses and home world attacks. The rules and numbers are set here.",
   modelEnhanced: "Enhanced War",
-  modelEnhancedText: "The Vanilla war with more on top: custom events, orders and subfactions, played with the Enhanced War Client mod.",
   modelEnhancedShort: "Enhanced",
   enhancedModTitle: "Enhanced War Client Required",
   enhancedModText: "Every player in an Enhanced War needs the Enhanced War Client mod. Obsidian sets it up when the war is created or selected. Until the Enhanced rules arrive, the war plays as a Vanilla war.",

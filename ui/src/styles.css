@@ -283,8 +283,15 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .create-head { display: flex; align-items: center; gap: 0.8rem; }
 .create-head h1 { font-size: 1.25rem; letter-spacing: 0.18em; }
 .create-body { display: flex; flex-direction: column; gap: 0.8rem; }
-.create-main { padding: 1.1rem 1.2rem 1.2rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.create-main { padding: 1.3rem 1.4rem 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.create-main > .field { gap: 0.7rem; }
+/* Section titles as on the save view of Obsidian: a gold square, the title in capitals, a dashed rule. */
+.create-h { display: flex; align-items: center; gap: 0.7rem; font-size: var(--fs-sm); letter-spacing: 0.18em; color: var(--tx); }
+.create-h::before { content: ""; flex: none; width: 0.5rem; height: 0.5rem; background: var(--gold); }
+.create-h::after { content: ""; flex: 1; border-top: 1px dashed color-mix(in srgb, var(--tx) 22%, transparent); }
+.field input.text-field.create-name { height: 2.9rem; padding: 0 0.9rem; font-family: "Saira Variable", Saira, sans-serif; font-size: 1.15rem; font-weight: 600; letter-spacing: 0.03em; }
 .create-foot { padding: 0 1.2rem; }
+.create-note { margin-right: auto; align-self: center; font-size: var(--fs-sm); }
 .create-foot-row { max-width: 58rem; margin: 0 auto; display: flex; justify-content: flex-end; gap: 0.6rem; padding: 0.75rem 0 0.9rem; border-top: 1px solid var(--ln); }
 .model-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .model-card, .preset-card { display: flex; align-items: center; gap: 0.9rem; padding: 0.8rem 0.9rem; text-align: left; cursor: pointer; border: 0; color: var(--tx);
@@ -304,14 +311,18 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .info-box > svg { flex: none; margin-top: 0.1rem; color: var(--goldtx); }
 .info-box b { display: block; margin-bottom: 0.2rem; font-size: var(--fs-base); }
 .mc-soon { flex: none; width: 4.2rem; height: 4.2rem; display: grid; place-items: center; text-align: center; font-size: var(--fs-xs); line-height: 1.3; color: var(--mu); border: 1px dashed var(--ln); }
-.mc-text { display: flex; flex-direction: column; gap: 0.3rem; }
-.mc-text b { font-size: var(--fs-md); }
-.mc-text .chip.later { margin-left: 0.5rem; vertical-align: 0.1em; text-transform: none; }
+.mc-text { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+.mc-text b { font-size: var(--fs-base); }
+.mc-text .chip.later { text-transform: none; }
 .mc-text small, .preset-card small { font-size: var(--fs-sm); color: var(--mu); line-height: 1.4; }
 .preset-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
-.preset-card { flex-direction: column; align-items: stretch; gap: 0.35rem; }
-.preset-card b { font-size: var(--fs-base); }
-.preset-nums { display: flex; flex-wrap: wrap; gap: 0.25rem 0.7rem; margin-top: 0.2rem; font-family: "Saira Variable", sans-serif; font-size: var(--fs-xs); color: var(--mu); font-variant-numeric: tabular-nums; }
+.preset-card { flex-direction: column; align-items: stretch; gap: 0.45rem; padding: 0.95rem 1rem 0.85rem; }
+.preset-card b { font-size: var(--fs-md); }
+/* The numbers of a preset sit at the foot of the card, each under a small label, so the three cards line up. */
+.preset-nums { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 0 1.1rem; margin-top: auto; padding-top: 0.6rem; border-top: 1px solid var(--ln);
+  font-family: "Saira Variable", sans-serif; font-size: var(--fs-md); font-weight: 600; color: var(--tx); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.preset-nums > span { display: flex; flex-direction: column; gap: 0.1rem; }
+.preset-nums i { font-style: normal; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mu); }
 .fold { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; background: none; border: 0; border-top: 1px solid var(--ln); color: var(--tx); cursor: pointer; text-align: left; transition: border-color var(--fast); }
 .fold:hover { border-top-color: color-mix(in srgb, var(--mu) 60%, transparent); }
 .fold svg { transition: transform var(--fast); }

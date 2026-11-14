@@ -60,7 +60,6 @@ export function WarList({ readOnly, onOpen, onCreate }: { readOnly: boolean; onO
         <div className="empty-card">
           <Skull variant="vanilla" width={96} height={96} />
           <p>{t("noWars")}</p>
-          {!readOnly && <button className="btn go" onClick={onCreate}><IPlus />{t("createWar")}</button>}
         </div>
       )}
 
