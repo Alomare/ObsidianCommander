@@ -1,11 +1,34 @@
 // The galactic war overview: the in-game map, regions coloured by who holds them, events marked. The only
 // text on the map is the sector numbers; names and states are in the tooltip and the side panel.
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type KeyboardEvent as RKeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type KeyboardEvent as RKeyboardEvent } from "react";
 import type { War, WarEvent } from "../types";
 import { isMock } from "../api";
 import { t } from "../strings";
 import { clock, enemyName, pct, regionName, regionOf, regionProgress, FACTION_OF } from "../util";
 import { FACTIONS, FRONT_MID, FRONT_SPAN, OUTER_R, REGIONS, SUPER_EARTH_R, gameColor, polar, ringRadius, wedgePath, type Faction, type RegionShape } from "./geometry";
+
+const TIP_GAP = 14;
+const TIP_EDGE = 6;
+
+/** The hover tooltip, below and right of the pointer, moved to the other side or in from the edge so the
+    whole box stays inside the map. */
+function MapTip({ x, y, title, lines }: { x: number; y: number; title: string; lines: string[] }) {
+  const el = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x + TIP_GAP, top: y + TIP_GAP });
+  useLayoutEffect(() => {
+    const tip = el.current;
+    const box = tip?.offsetParent as HTMLElement | null;
+    if (!tip || !box) return;
+    const w = tip.offsetWidth, h = tip.offsetHeight, W = box.clientWidth, H = box.clientHeight;
+    const place = (at: number, size: number, room: number) => {
+      let p = at + TIP_GAP;
+      if (p + size > room - TIP_EDGE) p = at - TIP_GAP - size;
+      return Math.max(TIP_EDGE, Math.min(p, room - TIP_EDGE - size));
+    };
+    setPos({ left: place(x, w, W), top: place(y, h, H) });
+  }, [x, y, title, lines]);
+  return <div ref={el} className="map-tip" style={pos}><b>{title}</b>{lines.map((l, i) => <span key={i}>{l}</span>)}</div>;
+}
 
 export type Selection =
   | { kind: "front"; enemy: number }
@@ -335,7 +358,7 @@ export const GalaxyMap = memo(function GalaxyMap({ war, names, selection, onSele
         </g>
       </svg>
 
-      {hover && <div className="map-tip" style={{ left: hover.x, top: hover.y }}><b>{hover.title}</b>{hover.lines.map((l, i) => <span key={i}>{l}</span>)}</div>}
+      {hover && <MapTip x={hover.x} y={hover.y} title={hover.title} lines={hover.lines} />}
       {zoomed && <button className="btn small map-reset" onClick={() => setView(FULL)}>{t("zoomReset")}</button>}
     </div>
   );

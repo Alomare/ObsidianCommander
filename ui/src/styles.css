@@ -481,7 +481,7 @@ input[type="range"]:disabled::-webkit-slider-runnable-track { background: linear
 .marker-icon { filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.9)); transition: transform var(--fast); }
 .marker:hover .marker-icon { transform: scale(1.12); }
 
-.map-tip { position: absolute; z-index: 5; pointer-events: none; transform: translate(14px, 14px); display: flex; flex-direction: column; gap: 0.1rem; min-width: 11rem; padding: 0.45rem 0.7rem 0.5rem;
+.map-tip { position: absolute; z-index: 5; pointer-events: none; display: flex; flex-direction: column; gap: 0.1rem; min-width: 11rem; padding: 0.45rem 0.7rem 0.5rem;
   background: var(--edge-corners), linear-gradient(160deg, rgba(30, 34, 42, 0.96), rgba(14, 16, 20, 0.96)); --edge: rgba(255, 255, 255, 0.16); background-origin: border-box;
   box-shadow: inset 0 0 0 1px var(--edge), inset 0 2px 0 var(--gold); color: var(--map-tx); font-size: var(--fs-sm); }
 .map-tip b { font-family: "Saira Variable", sans-serif; font-size: var(--fs-base); font-weight: 660; letter-spacing: 0.03em; }
