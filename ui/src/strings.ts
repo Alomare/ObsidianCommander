@@ -191,7 +191,7 @@ const en = {
   internetText: "Players outside this network join with an address and the invite code. Needs TCP port {port} forwarded on the router to this PC, or a tunnel such as playit.gg pointed at that port. On a VPN such as Tailscale, LAN is enough.",
   internetAsk: "With Internet on, the war answers any caller from outside this network who has the invite code, and LAN opens too. Forward TCP port {port} on the router to this PC and send players the public address with the port, such as 203.0.113.7:{port}, or send the address a tunnel service gives for that port. Send the code with it.",
   invite: "Invite Code",
-  inviteText: "Players type this code with the address under Join War, Join by Address in Obsidian. The war server takes the player name each game reports, so give the code to trusted players only. New Code shuts out everyone who has the old one.",
+  inviteText: "Players type this code with the address under Join War, On another network, in Obsidian. The war server takes the player name each game reports, so give the code to trusted players only. New Code shuts out everyone who has the old one.",
   inviteCopy: "Copy Code",
   inviteCopied: "Invite code copied",
   inviteCopyFailed: "The code could not be copied. Select the text and copy.",
