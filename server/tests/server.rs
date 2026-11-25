@@ -198,8 +198,8 @@ fn game_api_answers_like_the_official_server() {
     assert_eq!(s["statistics"].as_array().unwrap().len(), 3);
     assert!(s.get("defend_event").is_none());
 
-    // complete_planets: the planet `enemy` value is 1-based, so 2 is the cyborgs (front 1).
-    let planets = json!([{"index": 1, "enemy": 2, "season": season, "difficulty": 4, "success": 0.700004995}]).to_string();
+    // complete_planets: the planet `enemy` counts from 0, so 1 is the cyborgs (front 1).
+    let planets = json!([{"index": 1, "enemy": 1, "season": season, "difficulty": 4, "success": 0.700004995}]).to_string();
     let a = auth();
     let r = game(
         h.port,

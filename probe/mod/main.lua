@@ -232,6 +232,8 @@ function COMMANDS.campaign_mission(rest)
 	sm:set("available_planets", available)
 	local planet = table.clone(best)
 	planet.region = front.current_region
+	-- The planet screen stores the front from 0 in the planet it saves; the rolled one counts from 1.
+	planet.enemy = enemy - 1
 	planet.selected_mission_index = last
 	sm:set("selected_trial", nil)
 	sm:set("next_mission_seed", nil)

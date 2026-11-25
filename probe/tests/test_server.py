@@ -84,8 +84,8 @@ class ProbeServer(unittest.TestCase):
 
     def test_completed_planets_move_the_front(self):
         before = [s["points"] for s in self.post(action="get_campaign_status")["campaign_status"]]
-        # As the game sent it in probe run 5, for a cyborg planet: enemy is 1-based here.
-        planets = json.dumps([{"difficulty": 4, "enemy": 2, "index": 1, "season": 1162, "success": 0.700004995}])
+        # A cyborg planet as real play sends it: enemy counts from 0.
+        planets = json.dumps([{"difficulty": 4, "enemy": 1, "index": 1, "season": 1162, "success": 0.700004995}])
         r = self.post(action="complete_planets", auth=self.auth(), planets=planets)
         self.assertEqual(r["completed_planets"], 1)
         after = [s["points"] for s in r["campaign_status"]]

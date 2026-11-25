@@ -41,14 +41,14 @@ Each run opens the war screen once (which rolls the planets), then the probe com
 | 2 (`20261104-233241`) | bugs | `win` refused, the Helldiver died twice, mission lost | A lost mission uploads statistics (`successful_missions: 0`), acked and the queue emptied. **The probe save was written to disk** (`saves/cmdprobe_<id>.sav`, `_user.sav`, each with an `.old`) and the real saves stayed identical. Question 6 is closed |
 | 3 (`20261104-234701`) | bugs | `win` refused again, with the reason logged: `needs_session`, while `lobby_host == peer` and `is_host` true | **Obsidian API keeps shared-game calls (`win`, `effects`) for session mods.** The probe is a client mod on purpose, because session scope turns on the loader upload block |
 | 4 (`20261104-235824`) | bugs | Won (direct calls after the refusal), end screens done in 9 s, back on the ship | `upload_statistics` and `upload_leaderboard_statistics`, both acked, queues emptied. **No planet was reported**: the defend event on the bugs front put the planets in region 3, and mission end only reports when that matches the region the points are in (5) |
-| 5 (`20261105-000736`) | cyborgs | Won, all three writes | `complete_planets` came in: question 4 is closed. **`enemy` in that upload is 1-based** (2 for this cyborg planet), so the probe server credited the wrong front until fixed |
+| 5 (`20261105-000736`) | cyborgs | Won, all three writes | `complete_planets` came in: question 4 is closed. `enemy` in that upload was 2 for this cyborg planet. **Wrong lesson, corrected 2026-11-24:** `campaign_mission` saved the raw `available_planets` entry (front index from 1); real play saves the planet screen's copy, which counts from 0 |
 
 Request shapes are in [protocol.md](protocol.md#writes). Every run ended with `real saves identical`.
 
 What the mission runs mean for the design:
 
 - **The companion mod can't be a plain session mod** while the loader blocks uploads for session content (`loader/src/backend_block.lua`). Custom-war missions have to upload to the custom server. The loader needs a "custom war active" state: the URL points at the relay, uploads are allowed because they can only reach the relay, and shared-game API calls are open to the companion mod of the war. An expansion-like scope is the closest fit.
-- **The orchestrator must count enemies from 1 in `complete_planets`** and from 0 everywhere else.
+- ~~The orchestrator must count enemies from 1 in `complete_planets`~~. Real play counts from 0 there too (see [protocol.md](protocol.md#writes)).
 - **During a defend event, normal planet reporting freezes on that front.** Orchestrator events have to be designed around it: during an event, that front advances only through event missions.
 
 Not covered yet: event missions (`complete_defend_mission`, `complete_attack_mission`), Proving Grounds uploads, lobby isolation with a second player, leaving the season-end flow, and the `broken` scenario.

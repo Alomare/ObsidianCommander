@@ -1240,8 +1240,7 @@ impl War {
         !self.state.ended()
     }
 
-    /// A completed planet. `front` is 0-based here: the caller has already turned the 1-based in-game
-    /// planet `enemy` into a front.
+    /// A completed planet. `front` is 0-based, as the in-game planet `enemy` is.
     pub fn credit_planet(
         &mut self,
         player: &str,

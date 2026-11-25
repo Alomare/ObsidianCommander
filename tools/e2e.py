@@ -131,10 +131,10 @@ def main():
         code, st = game(base, wid, {"action": "upload_statistics", "statistics": json.dumps(stats)})
         check("upload_statistics ack", st.get("uploaded_statistics") == 4, str(st)[:200])
         before = rows[1]["points"]
-        planets = [{"index": 1, "enemy": 2, "season": season, "difficulty": 4, "success": 0.700004995}]
+        planets = [{"index": 1, "enemy": 1, "season": season, "difficulty": 4, "success": 0.700004995}]
         code, st = game(base, wid, {"action": "complete_planets", "planets": json.dumps(planets)})
         after = st.get("campaign_status", [{}, {}])[1].get("points")
-        check("complete_planets credits cyborgs (enemy 2, 1-based)", st.get("completed_planets") == 1 and after is not None and after > before, f"{before} -> {after}")
+        check("complete_planets credits cyborgs (enemy 1, from 0)", st.get("completed_planets") == 1 and after is not None and after > before, f"{before} -> {after}")
         code, st = game(base, wid, {"action": "complete_planets", "planets": json.dumps(planets)})
         again = st.get("campaign_status", [{}, {}])[1].get("points")
         check("the same planet index counts once", again == after, f"{after} -> {again}")

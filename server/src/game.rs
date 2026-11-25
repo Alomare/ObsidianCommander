@@ -394,11 +394,12 @@ pub fn handle(
                 if !row_season_ok(w, r) {
                     return;
                 }
-                // The planet `enemy` value counts from 1.
+                // The planet `enemy` counts from 0 like the rest of the protocol: the planet screen
+                // stores `selected_race - 1` in the planet the drop saves as `current_planet`.
                 let Some(enemy) = r
                     .get("enemy")
                     .and_then(Value::as_i64)
-                    .filter(|e| (1..=ENEMIES as i64).contains(e))
+                    .filter(|e| (0..ENEMIES as i64).contains(e))
                 else {
                     return;
                 };
@@ -406,7 +407,7 @@ pub fn handle(
                 let success = r.get("success").and_then(Value::as_f64).unwrap_or(0.0);
                 w.credit_planet(
                     player,
-                    (enemy - 1) as usize,
+                    enemy as usize,
                     difficulty,
                     success,
                     now,

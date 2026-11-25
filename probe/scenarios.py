@@ -65,17 +65,15 @@ class War:
     def complete_planets(self, planets):
         """A planet completion gives 1000 points per difficulty level to that front, capped at max.
 
-        Here `enemy` is the planet field, 1-based (1 bugs, 2 cyborgs, 3 illuminates), unlike
-        every other enemy number in the protocol: probe run 5 sent enemy 2 for a cyborg planet whose
-        upload_statistics said enemy 1. `success` is a fraction (0.700004995 there), `difficulty` the
+        `enemy` counts from 0 as everywhere else in the protocol (real play saves the planet
+        screen's copy of the planet, which stores `selected_race - 1`). `success` is a fraction (0.700004995 there), `difficulty` the
         sum of (mission difficulty + 1) over the planet missions."""
         for p in planets:
             if not isinstance(p, dict):
                 continue
             enemy = p.get("enemy")
-            if not isinstance(enemy, int) or not 1 <= enemy <= 3:
+            if not isinstance(enemy, int) or not 0 <= enemy <= 2:
                 continue
-            enemy -= 1
             success = p.get("success")
             if not isinstance(success, (int, float)) or success <= 0:
                 continue
